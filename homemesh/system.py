@@ -51,6 +51,29 @@ def mdns():
     return False, None
 
 
+def _program(name):
+    """Programs for root too, which are not in everyone's PATH."""
+    return shutil.which(name, path=os.environ.get("PATH", "") + ":/usr/bin:/usr/sbin:/bin:/sbin")
+
+
+def missing(mdns_works):
+    """What sharing needs and this computer lacks, as the root helper calls it.
+
+    Only what is certain: with systemd-resolved running, the helper first
+    tries to do without Avahi.
+    """
+    found = [] if _program("sshd") else ["sshd"]
+    if not mdns_works and not os.path.isdir("/run/systemd/resolve") and not _program("avahi-daemon"):
+        found.append("avahi")
+    return found
+
+
+def thing_names(things):
+    """For people: what `things` (as the root helper calls them) are."""
+    names = {"sshd": _("SSH server (openssh)"), "avahi": "Avahi"}
+    return ", ".join(names.get(thing, thing) for thing in things)
+
+
 def gvfs_sftp():
     try:
         from gi.repository import Gio
@@ -115,6 +138,11 @@ def step_text(step):
 class HelperResult:
     def __init__(self, ok, steps, error=None):
         self.ok, self.steps, self.error = ok, steps, error
+
+    @property
+    def missing(self):
+        """What "homemesh-helper enable --install" would install to make it work."""
+        return [thing for step in self.steps if not step.get("ok") for thing in step.get("missing", [])]
 
 
 def run_helper(args, terminal=False):

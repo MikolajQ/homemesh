@@ -107,6 +107,8 @@ class HelperTest(unittest.TestCase):
         (self.root / "etc/ssh/sshd_config").write_text(
             "Include /etc/ssh/sshd_config.d/*.conf\nUsePAM yes\n")
         (self.root / "etc/hosts").write_text("127.0.0.1 localhost\n127.0.1.1 stary\n")
+        (self.root / "usr/bin").mkdir(parents=True)
+        (self.root / "usr/bin/sshd").touch()
         self.log = self.tmp / "log"
         self.log.touch()
         for name, script in (("systemctl", SYSTEMCTL), ("ssh-keygen", LOGGER), ("resolvectl", RESOLVECTL)):
@@ -283,12 +285,140 @@ class MdnsTest(HelperTest):
         self.assertEqual(self.files(), [])
         self.assertNotIn("systemctl enable avahi-daemon.service", self.calls())
 
+    def test_offers_avahi_when_resolved_cannot(self):
+        self.off_in("zzz-last.conf")
+        code, steps = self.run_helper("enable")
+        self.assertEqual((code, steps[-1]["missing"]), (1, ["avahi", "nss-mdns"]))
+        self.assertEqual(self.files(), ["zzz-last.conf"])
+
     def test_names_the_file_it_cannot_override(self):
         self.off_in("zzz-last.conf")
+        self.avahi(masked=True)
         ok, message = self.enable()
         self.assertFalse(ok)
         self.assertIn("MulticastDNS=no in /etc/systemd/resolved.conf.d/zzz-last.conf", message)
         self.assertEqual(self.files(), ["zzz-last.conf"])
+
+
+# A package manager that "installs" what the test expects of each package.
+INSTALLER = """#!/bin/sh
+echo "$(basename "$0") $*" >> "$LOG"
+[ -e "$STATE_DIR/no-package-lists" ] && [ "$1" = install ] && { echo "E: Unable to locate package" >&2; exit 100; }
+[ "$1" = update ] && rm -f "$STATE_DIR/no-package-lists"
+[ -e "$STATE_DIR/broken" ] && {
+  printf 'error: failed to synchronize (unable to lock database)\\nErrors occurred, no packages were upgraded.\\n' >&2
+  exit 1; }
+for name; do
+  case "$name" in
+    openssh|openssh-server) touch "$HOMEMESH_HELPER_ROOT/usr/bin/sshd";;
+    avahi|avahi-daemon) touch "$HOMEMESH_HELPER_ROOT/usr/lib/systemd/system/avahi-daemon.service";;
+    nss-mdns) touch "$HOMEMESH_HELPER_ROOT/usr/lib/libnss_mdns_minimal.so.2";;
+    libnss-mdns) touch "$HOMEMESH_HELPER_ROOT/usr/lib/libnss_mdns_minimal.so.2"
+        sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' "$HOMEMESH_HELPER_ROOT/etc/nsswitch.conf";;
+  esac
+done
+"""
+
+
+class PackagesTest(HelperTest):
+    """Missing packages: named without --install, installed with it."""
+
+    def setUp(self):
+        super().setUp()
+        for name in ("pacman", "apt-get", "dnf", "zypper", "xbps-install", "apk"):
+            self.tool(name, INSTALLER)
+        (self.root / "usr/lib/systemd/system").mkdir(parents=True)
+        (self.root / "etc/nsswitch.conf").write_text("hosts: files dns\n")
+
+    def distribution(self, text):
+        (self.root / "etc/os-release").write_text(text)
+
+    def installs(self):
+        return [line for line in self.calls().splitlines() if line.split()[0] in
+                ("pacman", "apt-get", "dnf", "zypper", "xbps-install", "apk")]
+
+    def no_resolved(self):
+        self.tool("systemctl", SYSTEMCTL.replace("systemd-resolved.service", "none.service"))
+        self.tool("resolvectl", "#!/bin/sh\nexit 1\n")
+
+    def test_without_asking_nothing_is_installed(self):
+        (self.root / "usr/bin/sshd").unlink()
+        code, steps = self.run_helper("enable", HOMEMESH_HELPER_PM="pacman")
+        self.assertEqual(code, 1)
+        self.assertEqual((steps[0]["ok"], steps[0]["missing"]), (False, ["sshd"]))
+        self.assertEqual(self.installs(), [])
+
+    def test_installs_the_ssh_server(self):
+        (self.root / "usr/bin/sshd").unlink()
+        code, steps = self.run_helper("enable", "--install", HOMEMESH_HELPER_PM="pacman")
+        self.assertEqual(code, 0, steps)
+        self.assertEqual(steps[0]["msg"], "Installed openssh.")
+        self.assertEqual(self.installs(), ["pacman -S --needed --noconfirm openssh"])
+        self.assertFalse(any("missing" in s for s in steps))
+
+    def test_installs_avahi_and_nss_mdns(self):
+        self.no_resolved()
+        code, steps = self.run_helper("enable", HOMEMESH_HELPER_PM="dnf")
+        self.assertEqual((code, steps[-1]["missing"]), (1, ["avahi", "nss-mdns"]))
+        code, steps = self.run_helper("enable", "--install", HOMEMESH_HELPER_PM="dnf")
+        self.assertEqual(code, 0, steps)
+        self.assertEqual(self.installs(), ["dnf install -y avahi nss-mdns"])
+        self.assertIn("systemctl restart avahi-daemon.service", self.calls())
+        self.assertEqual((self.root / "etc/nsswitch.conf").read_text(),
+                         "hosts: files mdns_minimal [NOTFOUND=return] dns\n")
+        self.run_helper("disable")
+        self.assertIn("systemctl disable avahi-daemon.service", self.calls())
+
+    def test_debian_names_fresh_lists_and_its_own_nsswitch(self):
+        self.no_resolved()
+        (self.state_dir / "no-package-lists").touch()
+        code, steps = self.run_helper("enable", "--install", HOMEMESH_HELPER_PM="apt-get")
+        self.assertEqual(code, 0, steps)
+        self.assertEqual(self.installs(), ["apt-get install -y avahi-daemon libnss-mdns", "apt-get update",
+                                           "apt-get install -y avahi-daemon libnss-mdns"])
+        self.assertEqual((self.root / "etc/nsswitch.conf").read_text().count("mdns"), 1)
+
+    def test_artix_service_packages(self):
+        (self.root / "usr/bin/sshd").unlink()
+        for init in ("openrc", "runit", "s6", "dinit"):
+            self.run_helper("enable", "--install", HOMEMESH_HELPER_PM="pacman", HOMEMESH_HELPER_INIT=init)
+            self.assertIn(f"pacman -S --needed --noconfirm openssh openssh-{init}", self.calls())
+            (self.root / "usr/bin/sshd").unlink()
+
+    def test_the_distribution_decides_not_what_else_is_there(self):
+        for text, expected in (
+                ('ID=cachyos\nID_LIKE=arch\n', "pacman -S --needed --noconfirm gvfs"),
+                ('NAME="Linux Mint"\nID=linuxmint\nID_LIKE="ubuntu debian"\n', "apt-get install -y gvfs-backends"),
+                ("ID='fedora'\n", "dnf install -y gvfs"),
+                ('ID="opensuse-tumbleweed"\nID_LIKE="opensuse suse"\n',
+                 "zypper --non-interactive install gvfs-backends"),
+                ('ID="void"\n', "xbps-install -Sy gvfs"),
+                ("ID=alpine\n", "apk add --update-cache gvfs"),
+                ('ID=artix\n', "pacman -S --needed --noconfirm gvfs"),
+                ('ID="something-else"\n', "pacman -S --needed --noconfirm gvfs")):  # the first one there is
+            with self.subTest(text):
+                self.log.write_text("")
+                self.distribution(text)
+                code, steps = self.run_helper("install", "gvfs", HOMEMESH_HELPER_PM="detect")
+                self.assertEqual(code, 0, steps)
+                self.assertEqual(self.installs(), [expected])
+
+    def test_says_why_it_could_not_install(self):
+        (self.state_dir / "broken").touch()
+        code, steps = self.run_helper("install", "bubblewrap", HOMEMESH_HELPER_PM="pacman")
+        self.assertEqual(code, 1)
+        self.assertEqual(steps[0]["msg"], "Could not install bubblewrap with pacman: failed to synchronize (unable to "
+                                          "lock database). Update the system, then try again.")
+
+    def test_unknown_package_manager(self):
+        code, steps = self.run_helper("install", "gvfs", "bubblewrap")
+        self.assertEqual(code, 1)
+        self.assertIn("gvfs, bubblewrap", steps[0]["msg"])
+
+    def test_only_known_things(self):
+        code, steps = self.run_helper("install", "gvfs", "--root=/", HOMEMESH_HELPER_PM="pacman")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.installs(), [])
 
 
 class TailscaleTest(HelperTest):
@@ -306,7 +436,6 @@ class TailscaleTest(HelperTest):
 
     def installed(self):
         """Tailscale already there, as a package without any service definition."""
-        (self.root / "usr/bin").mkdir(parents=True)
         for name in ("tailscale", "tailscaled"):
             shutil.copy(self.fake, self.root / "usr/bin" / name)
 

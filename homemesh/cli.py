@@ -18,10 +18,14 @@ def has_display():
     return bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"))
 
 
-def print_result(result, ok_text):
+def print_steps(result):
     for step in result.steps:
         mark = "✓" if step.get("ok") else "✗"
         print(f"  {mark} {system.step_text(step)}")
+
+
+def print_result(result, ok_text):
+    print_steps(result)
     if result.error:
         print(f"  ✗ {result.error}")
     if result.ok:
@@ -79,8 +83,13 @@ def cmd_status(args):
 
 
 def cmd_enable(args):
-    return print_result(system.run_helper(["enable"], terminal=True),
-                        _("Sharing is on. Now pair your computers: homemesh pair"))
+    result = system.run_helper(["enable", "--install"] if args.install else ["enable"], terminal=True)
+    if result.missing and not args.install and sys.stdin.isatty():
+        print_steps(result)
+        if not ask_yes(_("Install the missing packages? [y/N] ")):
+            return 1
+        result = system.run_helper(["enable", "--install"], terminal=True)
+    return print_result(result, _("Sharing is on. Now pair your computers: homemesh pair"))
 
 
 def cmd_disable(args):
@@ -113,8 +122,7 @@ def cmd_away(args):
 
     def run_helper(helper_args):
         result = system.run_helper(helper_args, terminal=True)
-        for step in result.steps:
-            print(f"  {'✓' if step.get('ok') else '✗'} {system.step_text(step)}")
+        print_steps(result)
         return result
 
     def report(stage, value):
@@ -387,9 +395,13 @@ def cmd_share(args):
         if not os.path.isdir(path):
             print(_("No such folder: {path}").format(path=path))
             return 1
-        if not share.sandbox_available():
-            print(_("Sharing chosen folders needs the bubblewrap package."))
-            return 1
+        missing = share.sandbox_missing()
+        if missing:
+            print(_("Sharing chosen folders needs: {packages}.").format(packages=system.thing_names(missing)))
+            if not sys.stdin.isatty() or not ask_yes(_("Install the missing packages? [y/N] ")):
+                return 1
+            if print_result(system.run_helper(["install", *missing], terminal=True), _("Installed.")):
+                return 1
         folders.append({"path": path, "readonly": args.readonly})
     save_share({"mode": "folders", "folders": folders})
     return 0
@@ -420,7 +432,9 @@ def build_parser():
     parser.add_argument("--version", action="version", version=f"homemesh {__version__}")
     sub = parser.add_subparsers(dest="command", metavar=_("COMMAND"))
     sub.add_parser("status", help=_("the state of this computer and the group")).set_defaults(func=cmd_status)
-    sub.add_parser("enable", help=_("turn sharing on (asks for the administrator password)")).set_defaults(func=cmd_enable)
+    enable = sub.add_parser("enable", help=_("turn sharing on (asks for the administrator password)"))
+    enable.add_argument("--install", action="store_true", help=_("install missing packages without asking"))
+    enable.set_defaults(func=cmd_enable)
     sub.add_parser("disable", help=_("turn sharing off")).set_defaults(func=cmd_disable)
     pair = sub.add_parser("pair", help=_("pair with another computer (with a code)"))
     pair.add_argument("target", nargs="?", help=_("the other computer's name or address[:port]"))

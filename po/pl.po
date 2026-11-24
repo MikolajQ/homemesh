@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: homemesh\n"
 "Report-Msgid-Bugs-To: https://github.com/MikolajQ/homemesh/issues\n"
-"POT-Creation-Date: 2026-11-24 18:08+0100\n"
+"POT-Creation-Date: 2026-11-24 18:15+0100\n"
 "PO-Revision-Date: 2026-11-24 16:00+0100\n"
 "Last-Translator: MikolajQ\n"
 "Language-Team: Polish\n"
@@ -16,15 +16,34 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 "
 "|| n%100>14) ? 1 : 2);\n"
 
-#: helper/homemesh-helper:324
+#: helper/homemesh-helper:397
+#, python-brace-format
 msgid ""
-"The SSH server is missing. Install the openssh package (on Artix also "
-"openssh-openrc, -runit, -s6 or -dinit)."
+"HomeMesh does not know this system's package manager. Install these packages "
+"with it: {packages}."
 msgstr ""
-"Brak serwera SSH. Zainstaluj pakiet openssh (w Artix również openssh-openrc, "
-"-runit, -s6 lub -dinit)."
+"HomeMesh nie zna menedżera pakietów tego systemu. Zainstaluj nim te pakiety: "
+"{packages}."
 
-#: helper/homemesh-helper:328
+#: helper/homemesh-helper:404
+#, python-brace-format
+msgid ""
+"Could not install {packages} with {tool}: {error}. Update the system, then "
+"try again."
+msgstr ""
+"Nie udało się zainstalować {packages} ({tool}): {error}. Zaktualizuj system "
+"i spróbuj ponownie."
+
+#: helper/homemesh-helper:407
+#, python-brace-format
+msgid "Installed {packages}."
+msgstr "Zainstalowano: {packages}."
+
+#: helper/homemesh-helper:430
+msgid "The SSH server is missing."
+msgstr "Brak serwera SSH."
+
+#: helper/homemesh-helper:433
 msgid ""
 "/etc/ssh/sshd_config does not read the sshd_config.d directory. Add at its "
 "top: Include /etc/ssh/sshd_config.d/*.conf"
@@ -32,75 +51,60 @@ msgstr ""
 "Plik /etc/ssh/sshd_config nie wczytuje katalogu sshd_config.d. Dopisz na "
 "jego początku: Include /etc/ssh/sshd_config.d/*.conf"
 
-#: helper/homemesh-helper:343
+#: helper/homemesh-helper:448
 #, python-brace-format
 msgid "The SSH server refused the settings: {error}"
 msgstr "Serwer SSH odrzucił ustawienia: {error}"
 
-#: helper/homemesh-helper:345
+#: helper/homemesh-helper:450
 msgid ""
 "Network logins with keys only, no passwords; the root account is locked out."
 msgstr "Logowanie przez sieć tylko kluczem, bez haseł; konto root zablokowane."
 
-#: helper/homemesh-helper:351
+#: helper/homemesh-helper:456
 msgid "Unknown init system. Turn on the sshd service by hand."
 msgstr "Nie rozpoznaję systemu startowego. Włącz usługę sshd ręcznie."
 
-#: helper/homemesh-helper:354
+#: helper/homemesh-helper:461
 #, python-brace-format
-msgid ""
-"No sshd service for the {init} init system (on Artix: the openssh-{init} "
-"package)."
-msgstr ""
-"Brak usługi sshd dla systemu startowego {init} (w Artix: pakiet openssh-"
-"{init})."
+msgid "The sshd service for the {init} init system is missing."
+msgstr "Brak usługi sshd dla systemu init {init}."
 
-#: helper/homemesh-helper:363
+#: helper/homemesh-helper:470
 #, python-brace-format
 msgid "Could not start sshd: {error}"
 msgstr "Nie udało się uruchomić sshd: {error}"
 
-#: helper/homemesh-helper:365
+#: helper/homemesh-helper:472
 msgid "The SSH server is running and will start with the computer."
 msgstr "Serwer SSH działa i będzie startował razem z komputerem."
 
-#: helper/homemesh-helper:397
+#: helper/homemesh-helper:504
 msgid "No ufw or firewalld firewall found, so there is nothing to open."
 msgstr "Nie wykryto zapory ufw ani firewalld, więc nic nie trzeba otwierać."
 
-#: helper/homemesh-helper:408
+#: helper/homemesh-helper:515
 #, python-brace-format
 msgid "Firewall ({kind}): ports open for the local network, and SSH for VPNs."
 msgstr "Zapora ({kind}): otwarte porty dla sieci lokalnej i SSH dla sieci VPN."
 
-#: helper/homemesh-helper:423
+#: helper/homemesh-helper:530
 msgid "Firewall: the ports opened for HomeMesh are closed again."
 msgstr "Zapora: zamknięte porty otwarte dla HomeMesh."
 
-#: helper/homemesh-helper:519
+#: helper/homemesh-helper:632
 #, python-brace-format
 msgid ""
 ".local names work ({how}). This overrides MulticastDNS={value} in {path}."
 msgstr ""
 "Nazwy .local działają ({how}). Nadpisano MulticastDNS={value} z pliku {path}."
 
-#: helper/homemesh-helper:522 helper/homemesh-helper:531
-#: helper/homemesh-helper:552
+#: helper/homemesh-helper:635 helper/homemesh-helper:673
 #, python-brace-format
 msgid ".local names work ({how})."
 msgstr "Nazwy .local działają ({how})."
 
-#: helper/homemesh-helper:533 helper/homemesh-helper:554
-msgid ""
-"Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"
-msgstr "Avahi działa, ale brak nss-mdns. Zainstaluj: sudo pacman -S nss-mdns"
-
-#: helper/homemesh-helper:549
-#, python-brace-format
-msgid "Could not start Avahi: {error}"
-msgstr "Nie udało się uruchomić Avahi: {error}"
-
-#: helper/homemesh-helper:557
+#: helper/homemesh-helper:651
 #, python-brace-format
 msgid ""
 "MulticastDNS={value} in {path} keeps mDNS off in systemd-resolved. Remove "
@@ -109,7 +113,7 @@ msgstr ""
 "MulticastDNS={value} w pliku {path} wyłącza mDNS w systemd-resolved. Usuń tę "
 "linię, potem kliknij „Napraw”."
 
-#: helper/homemesh-helper:560
+#: helper/homemesh-helper:654
 msgid ""
 "Could not turn on mDNS: the avahi-daemon service is masked. Run: sudo "
 "systemctl unmask avahi-daemon.service avahi-daemon.socket, then click “Fix”."
@@ -118,67 +122,65 @@ msgstr ""
 "sudo systemctl unmask avahi-daemon.service avahi-daemon.socket, potem "
 "kliknij „Napraw”."
 
-#: helper/homemesh-helper:563
+#: helper/homemesh-helper:662
 msgid ""
-"Could not turn on mDNS in systemd-resolved. Install avahi and nss-mdns, then "
-"click “Fix”."
+"Avahi, the service that lets other computers find this one by name, is "
+"missing."
 msgstr ""
-"Nie udało się włączyć mDNS w systemd-resolved. Zainstaluj avahi i nss-mdns, "
-"potem kliknij „Napraw”."
+"Brak Avahi, usługi, dzięki której inne komputery znajdują ten po nazwie."
 
-#: helper/homemesh-helper:566
+#: helper/homemesh-helper:670
 #, python-brace-format
-msgid ""
-"No mDNS service, so other computers cannot find this one by name. Install: "
-"sudo pacman -S avahi nss-mdns (on Artix also avahi-{init}), then click “Fix”."
-msgstr ""
-"Brak usługi mDNS, więc inne komputery nie znajdą tego po nazwie. Zainstaluj: "
-"sudo pacman -S avahi nss-mdns (w Artix także avahi-{init}), potem kliknij "
-"„Napraw”."
+msgid "Could not start Avahi: {error}"
+msgstr "Nie udało się uruchomić Avahi: {error}"
 
-#: helper/homemesh-helper:734
+#: helper/homemesh-helper:675
+msgid "The nss-mdns package, which finds other computers by name, is missing."
+msgstr "Brak pakietu nss-mdns, który znajduje inne komputery po nazwie."
+
+#: helper/homemesh-helper:831
 msgid "Tailscale is already installed."
 msgstr "Tailscale jest już zainstalowany."
 
-#: helper/homemesh-helper:742
+#: helper/homemesh-helper:838
 #, python-brace-format
 msgid "Installed Tailscale with {tool}."
 msgstr "Zainstalowano Tailscale przez {tool}."
 
-#: helper/homemesh-helper:749
+#: helper/homemesh-helper:845
 #, python-brace-format
 msgid "Could not install Tailscale: {error}"
 msgstr "Nie udało się zainstalować Tailscale: {error}"
 
-#: helper/homemesh-helper:751
+#: helper/homemesh-helper:847
 #, python-brace-format
 msgid "Installed Tailscale {version} from tailscale.com."
 msgstr "Zainstalowano Tailscale {version} z tailscale.com."
 
-#: helper/homemesh-helper:796
+#: helper/homemesh-helper:892
 msgid "Unknown init system. Turn on the tailscaled service by hand."
 msgstr "Nie rozpoznaję systemu startowego. Włącz usługę tailscaled ręcznie."
 
-#: helper/homemesh-helper:806
+#: helper/homemesh-helper:902
 #, python-brace-format
 msgid "Could not start Tailscale: {error}"
 msgstr "Nie udało się uruchomić Tailscale: {error}"
 
-#: helper/homemesh-helper:811
+#: helper/homemesh-helper:907
 #, python-brace-format
 msgid "Tailscale did not start within {seconds} seconds."
 msgstr "Tailscale nie wystartował w ciągu {seconds} sekund."
 
-#: helper/homemesh-helper:815
+#: helper/homemesh-helper:911
 msgid "Tailscale is running and will start with the computer."
 msgstr "Tailscale działa i będzie startował razem z komputerem."
 
-#: helper/homemesh-helper:825
+#: helper/homemesh-helper:921
 #, python-brace-format
 msgid "Could not let {user} control Tailscale: {error}"
 msgstr "Nie udało się dać użytkownikowi {user} sterowania Tailscale: {error}"
 
-#: helper/homemesh-helper:828
+#: helper/homemesh-helper:924
 #, python-brace-format
 msgid ""
 "{user} can log in to Tailscale and turn it on and off without the "
@@ -187,7 +189,7 @@ msgstr ""
 "{user} może logować się do Tailscale oraz go włączać i wyłączać bez hasła "
 "administratora."
 
-#: helper/homemesh-helper:852
+#: helper/homemesh-helper:948
 msgid ""
 "Other users of this computer still share their folders, so the SSH server "
 "stays on."
@@ -195,11 +197,11 @@ msgstr ""
 "Inni użytkownicy tego komputera nadal udostępniają swoje katalogi, więc "
 "serwer SSH zostaje włączony."
 
-#: helper/homemesh-helper:867
+#: helper/homemesh-helper:963
 msgid "The SSH server is back to its settings from before HomeMesh."
 msgstr "Serwer SSH wrócił do ustawień sprzed HomeMesh."
 
-#: helper/homemesh-helper:876
+#: helper/homemesh-helper:972
 msgid ""
 "A name may have lowercase letters, digits and hyphens (no hyphen at the "
 "start or end)."
@@ -207,121 +209,125 @@ msgstr ""
 "Nazwa może mieć małe litery, cyfry i myślniki (bez myślnika na początku i "
 "końcu)."
 
-#: helper/homemesh-helper:897
+#: helper/homemesh-helper:993
 #, python-brace-format
 msgid "This computer is now called {name} ({name}.local)."
 msgstr "Ten komputer nazywa się teraz {name} ({name}.local)."
 
-#: homemesh/cli.py:42 homemesh/gui.py:846
+#: homemesh/cli.py:46 homemesh/gui.py:867
 msgid "paired directly"
 msgstr "połączony bezpośrednio"
 
-#: homemesh/cli.py:45 homemesh/gui.py:848
+#: homemesh/cli.py:49 homemesh/gui.py:869
 #, python-brace-format
 msgid "introduced by {name}"
 msgstr "przedstawiony przez {name}"
 
-#: homemesh/cli.py:46 homemesh/gui.py:849
+#: homemesh/cli.py:50 homemesh/gui.py:870
 msgid "introduced by another computer"
 msgstr "przedstawiony przez inny komputer"
 
-#: homemesh/cli.py:52
+#: homemesh/cli.py:56
 #, python-brace-format
 msgid "This computer: {name}  (other computers see it as {name}.local)"
 msgstr "Ten komputer: {name}  (inne komputery widzą go jako {name}.local)"
 
-#: homemesh/cli.py:54
+#: homemesh/cli.py:58
 msgid "Sharing: off. Turn on: homemesh enable"
 msgstr "Udostępnianie: wyłączone. Włącz: homemesh enable"
 
-#: homemesh/cli.py:56
+#: homemesh/cli.py:60
 msgid "Sharing: on, but the SSH server is not running. Fix: homemesh enable"
 msgstr ""
 "Udostępnianie: włączone, ale serwer SSH nie działa. Napraw: homemesh enable"
 
-#: homemesh/cli.py:58
+#: homemesh/cli.py:62
 msgid "Sharing: on"
 msgstr "Udostępnianie: włączone"
 
-#: homemesh/cli.py:60
+#: homemesh/cli.py:64
 #, python-brace-format
 msgid ".local names: working ({how})"
 msgstr "Nazwy .local: działają ({how})"
 
-#: homemesh/cli.py:61
+#: homemesh/cli.py:65
 msgid ".local names: not working. Fix: homemesh enable"
 msgstr "Nazwy .local: nie działają. Napraw: homemesh enable"
 
-#: homemesh/cli.py:62 homemesh/cli.py:364 homemesh/cli.py:376
+#: homemesh/cli.py:66 homemesh/cli.py:372 homemesh/cli.py:384
 #, python-brace-format
 msgid "Shared: {what}"
 msgstr "Udostępniane: {what}"
 
-#: homemesh/cli.py:64 homemesh/cli.py:111 homemesh/cli.py:142
+#: homemesh/cli.py:68 homemesh/cli.py:120 homemesh/cli.py:150
 #, python-brace-format
 msgid "Away from home: through {vpn}"
 msgstr "Poza domem: przez {vpn}"
 
-#: homemesh/cli.py:65
+#: homemesh/cli.py:69
 msgid "Away from home: not reachable. Set up Tailscale: homemesh away"
 msgstr "Poza domem: niedostępny. Ustaw Tailscale: homemesh away"
 
-#: homemesh/cli.py:66 homemesh/cli.py:404
+#: homemesh/cli.py:70 homemesh/cli.py:416
 msgid "At login: syncs the group and connects the chosen computers"
 msgstr "Po zalogowaniu: uzgadnia grupę i podłącza wybrane komputery"
 
-#: homemesh/cli.py:67
+#: homemesh/cli.py:71
 msgid "At login: nothing (turn on: homemesh autostart on)"
 msgstr "Po zalogowaniu: nic (homemesh autostart on włącza)"
 
-#: homemesh/cli.py:70
+#: homemesh/cli.py:74
 msgid "Paired computers: none. Pair: homemesh pair"
 msgstr "Połączone komputery: brak. Połącz: homemesh pair"
 
-#: homemesh/cli.py:72
+#: homemesh/cli.py:76
 msgid "Paired computers:"
 msgstr "Połączone komputery:"
 
-#: homemesh/cli.py:76 homemesh/gui.py:650
+#: homemesh/cli.py:80 homemesh/gui.py:669
 msgid "not reachable"
 msgstr "niedostępny"
 
-#: homemesh/cli.py:76
+#: homemesh/cli.py:80
 msgid "on the local network"
 msgstr "w sieci lokalnej"
 
-#: homemesh/cli.py:76
+#: homemesh/cli.py:80
 msgid "through VPN"
 msgstr "przez VPN"
 
-#: homemesh/cli.py:83
+#: homemesh/cli.py:89 homemesh/cli.py:401
+msgid "Install the missing packages? [y/N] "
+msgstr "Zainstalować brakujące pakiety? [t/N] "
+
+#: homemesh/cli.py:92
 msgid "Sharing is on. Now pair your computers: homemesh pair"
 msgstr "Udostępnianie włączone. Teraz połącz komputery: homemesh pair"
 
-#: homemesh/cli.py:87 homemesh/gui.py:1016
+#: homemesh/cli.py:96 homemesh/gui.py:1053
 msgid "Sharing is off."
 msgstr "Udostępnianie wyłączone."
 
-#: homemesh/cli.py:92 homemesh/gui.py:1083
+#: homemesh/cli.py:101 homemesh/gui.py:1132
 #, python-brace-format
 msgid "New name: {name}.local"
 msgstr "Nowa nazwa: {name}.local"
 
-#: homemesh/cli.py:122
+#: homemesh/cli.py:130
 msgid ""
 "Installing and starting Tailscale (asks for the administrator password)…"
 msgstr "Instaluję i uruchamiam Tailscale (pyta o hasło administratora)…"
 
-#: homemesh/cli.py:124 homemesh/gui.py:349
+#: homemesh/cli.py:132 homemesh/gui.py:355
 msgid "Connecting to Tailscale…"
 msgstr "Łączę z Tailscale…"
 
-#: homemesh/cli.py:126
+#: homemesh/cli.py:134
 #, python-brace-format
 msgid "Approve this computer in Tailscale's admin page: {url}"
 msgstr "Zatwierdź ten komputer na stronie administracyjnej Tailscale: {url}"
 
-#: homemesh/cli.py:129
+#: homemesh/cli.py:137
 #, python-brace-format
 msgid ""
 "Log in to Tailscale in your browser (the same account on all your "
@@ -330,28 +336,28 @@ msgstr ""
 "Zaloguj się do Tailscale w przeglądarce (tym samym kontem na wszystkich "
 "komputerach): {url}"
 
-#: homemesh/cli.py:143 homemesh/gui.py:383
+#: homemesh/cli.py:151 homemesh/gui.py:389
 msgid "This computer is connected to Tailscale."
 msgstr "Ten komputer jest połączony z Tailscale."
 
-#: homemesh/cli.py:144 homemesh/gui.py:384
+#: homemesh/cli.py:152 homemesh/gui.py:390
 msgid ""
 "Now set up Tailscale the same way on your other computers, with the same "
 "account."
 msgstr ""
 "Teraz ustaw Tailscale tak samo na pozostałych komputerach, tym samym kontem."
 
-#: homemesh/cli.py:163
+#: homemesh/cli.py:171
 #, python-brace-format
 msgid "  Code:  {code}"
 msgstr "  Kod:  {code}"
 
-#: homemesh/cli.py:165
+#: homemesh/cli.py:173
 #, python-brace-format
 msgid "Check that {name} shows the same code."
 msgstr "Sprawdź, czy na komputerze {name} widać ten sam kod."
 
-#: homemesh/cli.py:166
+#: homemesh/cli.py:174
 msgid ""
 "Paired computers have full access to each other's home folders: pair only "
 "your own."
@@ -359,30 +365,30 @@ msgstr ""
 "Połączone komputery mają pełny dostęp do swoich katalogów domowych: łącz "
 "tylko własne."
 
-#: homemesh/cli.py:168
+#: homemesh/cli.py:176
 msgid "Does it match? [y/N] "
 msgstr "Zgadza się? [t/N] "
 
-#: homemesh/cli.py:171 homemesh/gui.py:548
+#: homemesh/cli.py:179 homemesh/gui.py:567
 #, python-brace-format
 msgid "Waiting for confirmation on {name}…"
 msgstr "Czekam na potwierdzenie na komputerze {name}…"
 
-#: homemesh/cli.py:177
+#: homemesh/cli.py:185
 #, python-brace-format
 msgid "✓ Paired with {name}."
 msgstr "✓ Połączono z {name}."
 
-#: homemesh/cli.py:187
+#: homemesh/cli.py:195
 #, python-brace-format
 msgid "Cannot listen on the network ({error})."
 msgstr "Nie mogę nasłuchiwać w sieci ({error})."
 
-#: homemesh/cli.py:203
+#: homemesh/cli.py:211
 msgid "Looking for computers with HomeMesh open…"
 msgstr "Szukam komputerów z otwartym HomeMesh…"
 
-#: homemesh/cli.py:209
+#: homemesh/cli.py:217
 msgid ""
 "None found. Open HomeMesh on the other computer (or run “homemesh pair --"
 "wait” there) and try again."
@@ -390,20 +396,20 @@ msgstr ""
 "Nie widzę żadnego. Otwórz HomeMesh na drugim komputerze (albo uruchom tam "
 "„homemesh pair --wait”) i spróbuj ponownie."
 
-#: homemesh/cli.py:213
+#: homemesh/cli.py:221
 msgid "  (sharing is off)"
 msgstr "  (udostępnianie wyłączone)"
 
-#: homemesh/cli.py:216
+#: homemesh/cli.py:224
 msgid "Computer number: "
 msgstr "Numer komputera: "
 
-#: homemesh/cli.py:225
+#: homemesh/cli.py:233
 msgid "Sharing is off on this computer. First: homemesh enable"
 msgstr ""
 "Udostępnianie na tym komputerze jest wyłączone. Najpierw: homemesh enable"
 
-#: homemesh/cli.py:253
+#: homemesh/cli.py:261
 #, python-brace-format
 msgid ""
 "Waiting to be paired (port {port}). On the other computer, click “Connect” "
@@ -412,16 +418,16 @@ msgstr ""
 "Czekam na połączenie (port {port}). Na drugim komputerze kliknij „Połącz” "
 "przy nazwie {name}. Ctrl+C przerywa."
 
-#: homemesh/cli.py:269
+#: homemesh/cli.py:277
 msgid "Catching up with the rest of the group…"
 msgstr "Uzgadniam grupę z pozostałymi komputerami…"
 
-#: homemesh/cli.py:278
+#: homemesh/cli.py:286
 #, python-brace-format
 msgid "No computer called “{name}”."
 msgstr "Nie znam komputera „{name}”."
 
-#: homemesh/cli.py:282
+#: homemesh/cli.py:290
 #, python-brace-format
 msgid ""
 "Removed {name}. The other computers will learn about it the next time they "
@@ -430,15 +436,15 @@ msgstr ""
 "Usunięto {name}. Pozostałe komputery dowiedzą się o tym przy najbliższym "
 "uzgadnianiu."
 
-#: homemesh/cli.py:345
+#: homemesh/cli.py:353
 msgid "Remove this computer from the group and all HomeMesh settings? [y/N] "
 msgstr "Usunąć ten komputer z grupy i wszystkie ustawienia HomeMesh? [t/N] "
 
-#: homemesh/cli.py:356
+#: homemesh/cli.py:364
 msgid "Done. To turn sharing off as well: homemesh disable"
 msgstr "Gotowe. Udostępnianie wyłączysz poleceniem: homemesh disable"
 
-#: homemesh/cli.py:368
+#: homemesh/cli.py:376
 #, python-brace-format
 msgid ""
 "Ended {n} running connections; other computers have to open the folder again."
@@ -446,24 +452,29 @@ msgstr ""
 "Zakończono bieżące połączenia ({n}); inne komputery muszą otworzyć folder "
 "ponownie."
 
-#: homemesh/cli.py:382
+#: homemesh/cli.py:390
 msgid "Name a folder."
 msgstr "Podaj folder."
 
-#: homemesh/cli.py:388
+#: homemesh/cli.py:396
 #, python-brace-format
 msgid "No such folder: {path}"
 msgstr "Nie ma takiego folderu: {path}"
 
-#: homemesh/cli.py:391
-msgid "Sharing chosen folders needs the bubblewrap package."
-msgstr "Do udostępniania wybranych folderów potrzebny jest pakiet bubblewrap."
+#: homemesh/cli.py:400
+#, python-brace-format
+msgid "Sharing chosen folders needs: {packages}."
+msgstr "Do udostępniania wybranych folderów potrzeba: {packages}."
 
-#: homemesh/cli.py:405
+#: homemesh/cli.py:403 homemesh/gui.py:498 homemesh/gui.py:1065
+msgid "Installed."
+msgstr "Zainstalowano."
+
+#: homemesh/cli.py:417
 msgid "At login: nothing"
 msgstr "Po zalogowaniu: nic"
 
-#: homemesh/cli.py:418
+#: homemesh/cli.py:430
 #, python-brace-format
 msgid ""
 "{app}: the home folders of your computers in your file manager. Without "
@@ -472,43 +483,47 @@ msgstr ""
 "{app}: katalogi domowe twoich komputerów w menedżerze plików. Bez argumentów "
 "otwiera okno."
 
-#: homemesh/cli.py:421
+#: homemesh/cli.py:433
 msgid "COMMAND"
 msgstr "POLECENIE"
 
-#: homemesh/cli.py:422
+#: homemesh/cli.py:434
 msgid "the state of this computer and the group"
 msgstr "stan tego komputera i grupy"
 
-#: homemesh/cli.py:423
+#: homemesh/cli.py:435
 msgid "turn sharing on (asks for the administrator password)"
 msgstr "włącz udostępnianie (pyta o hasło administratora)"
 
-#: homemesh/cli.py:424
+#: homemesh/cli.py:436
+msgid "install missing packages without asking"
+msgstr "instaluj brakujące pakiety bez pytania"
+
+#: homemesh/cli.py:438
 msgid "turn sharing off"
 msgstr "wyłącz udostępnianie"
 
-#: homemesh/cli.py:425
+#: homemesh/cli.py:439
 msgid "pair with another computer (with a code)"
 msgstr "połącz z innym komputerem (kodem)"
 
-#: homemesh/cli.py:426
+#: homemesh/cli.py:440
 msgid "the other computer's name or address[:port]"
 msgstr "nazwa albo adres[:port] drugiego komputera"
 
-#: homemesh/cli.py:427
+#: homemesh/cli.py:441
 msgid "wait for the other computer to start"
 msgstr "czekaj, aż drugi komputer zacznie"
 
-#: homemesh/cli.py:429
+#: homemesh/cli.py:443
 msgid "remove a computer from the group"
 msgstr "usuń komputer z grupy"
 
-#: homemesh/cli.py:432
+#: homemesh/cli.py:446
 msgid "sync the group with the reachable computers"
 msgstr "uzgodnij grupę z dostępnymi komputerami"
 
-#: homemesh/cli.py:433
+#: homemesh/cli.py:447
 msgid ""
 "reach the computers away from home: sets up Tailscale (asks for the "
 "administrator password)"
@@ -516,50 +531,55 @@ msgstr ""
 "dostęp do komputerów spoza domu: ustawia Tailscale (pyta o hasło "
 "administratora)"
 
-#: homemesh/cli.py:435
+#: homemesh/cli.py:449
 msgid "rename this computer on the network"
 msgstr "zmień nazwę tego komputera w sieci"
 
-#: homemesh/cli.py:438
+#: homemesh/cli.py:452
 msgid "what other computers see: the whole home folder or chosen folders"
 msgstr "co widzą inne komputery: cały katalog domowy albo wybrane foldery"
 
-#: homemesh/cli.py:441
+#: homemesh/cli.py:455
 msgid "home: the whole home folder; add/remove: chosen folders"
 msgstr "home: cały katalog domowy; add/remove: wybrane foldery"
 
-#: homemesh/cli.py:443
+#: homemesh/cli.py:457
 msgid "read-only folder"
 msgstr "folder tylko do odczytu"
 
-#: homemesh/cli.py:445
+#: homemesh/cli.py:459
 msgid "syncing the group and connecting computers at login"
 msgstr "uzgadnianie grupy i podłączanie po zalogowaniu"
 
-#: homemesh/cli.py:449
+#: homemesh/cli.py:463
 msgid "leave the group and remove HomeMesh's settings"
 msgstr "opuść grupę i usuń ustawienia HomeMesh"
 
-#: homemesh/gui.py:199 homemesh/gui.py:236 homemesh/gui.py:331
-#: homemesh/gui.py:433 homemesh/gui.py:521 homemesh/gui.py:546
+#: homemesh/gui.py:199 homemesh/gui.py:242 homemesh/gui.py:337
+#: homemesh/gui.py:448 homemesh/gui.py:540 homemesh/gui.py:565
 msgid "Cancel"
 msgstr "Anuluj"
 
-#: homemesh/gui.py:221 homemesh/gui.py:314 homemesh/gui.py:316
-#: homemesh/gui.py:386 homemesh/gui.py:399 homemesh/gui.py:566
-#: homemesh/gui.py:578
+#: homemesh/gui.py:223 homemesh/gui.py:225 homemesh/gui.py:320
+#: homemesh/gui.py:322 homemesh/gui.py:392 homemesh/gui.py:405
+#: homemesh/gui.py:585 homemesh/gui.py:597
 msgid "Close"
 msgstr "Zamknij"
 
-#: homemesh/gui.py:226
+#: homemesh/gui.py:226 homemesh/gui.py:444 homemesh/gui.py:932
+#: homemesh/gui.py:967
+msgid "Install missing packages"
+msgstr "Zainstaluj brakujące pakiety"
+
+#: homemesh/gui.py:232
 msgid "Computer name"
 msgstr "Nazwa komputera"
 
-#: homemesh/gui.py:232
+#: homemesh/gui.py:238
 msgid "Computer name on the network"
 msgstr "Nazwa komputera w sieci"
 
-#: homemesh/gui.py:233
+#: homemesh/gui.py:239
 msgid ""
 "Other computers will see it under this name. Lowercase letters, digits and "
 "hyphens, for example “annas-laptop”."
@@ -567,19 +587,19 @@ msgstr ""
 "Inne komputery zobaczą go pod tą nazwą. Dozwolone są małe litery, cyfry i "
 "myślniki, np. „laptop-ani”."
 
-#: homemesh/gui.py:237
+#: homemesh/gui.py:243
 msgid "Change"
 msgstr "Zmień"
 
-#: homemesh/gui.py:244
+#: homemesh/gui.py:250
 msgid "Only lowercase letters, digits and hyphens."
 msgstr "Tylko małe litery, cyfry i myślniki."
 
-#: homemesh/gui.py:258 homemesh/gui.py:721
+#: homemesh/gui.py:264 homemesh/gui.py:742
 msgid "Away from home"
 msgstr "Poza domem"
 
-#: homemesh/gui.py:265
+#: homemesh/gui.py:271
 msgid ""
 "Away from home, files travel over your home's internet uplink, so large "
 "files are slower than on the local network."
@@ -587,11 +607,11 @@ msgstr ""
 "Poza domem pliki płyną przez łącze internetowe domu, więc duże pliki idą "
 "wolniej niż w sieci lokalnej."
 
-#: homemesh/gui.py:269 homemesh/gui.py:278
+#: homemesh/gui.py:275 homemesh/gui.py:284
 msgid "Access from away"
 msgstr "Dostęp spoza domu"
 
-#: homemesh/gui.py:270
+#: homemesh/gui.py:276
 #, python-brace-format
 msgid ""
 "This computer is reachable through {vpn}. Paired computers that also have a "
@@ -600,7 +620,7 @@ msgstr ""
 "Ten komputer jest dostępny przez {vpn}. Połączone komputery, które też mają "
 "VPN, otworzą go spoza domu tymi samymi zakładkami co w domu."
 
-#: homemesh/gui.py:273
+#: homemesh/gui.py:279
 msgid ""
 "Your other computers need the VPN too. While they are at home, they exchange "
 "their VPN addresses by themselves."
@@ -608,7 +628,7 @@ msgstr ""
 "Pozostałe komputery też potrzebują VPN-u. Gdy są w domu, same wymieniają się "
 "adresami VPN."
 
-#: homemesh/gui.py:279
+#: homemesh/gui.py:285
 msgid ""
 "At home computers talk over the local network. Away from home they need a "
 "VPN to reach each other over the internet."
@@ -616,7 +636,7 @@ msgstr ""
 "W domu komputery łączą się przez sieć lokalną. Poza domem potrzebują VPN-u, "
 "żeby połączyć się ze sobą przez internet."
 
-#: homemesh/gui.py:281
+#: homemesh/gui.py:287
 msgid ""
 "HomeMesh can set up Tailscale for you: it installs it, turns it on and opens "
 "the login page in your browser. Tailscale is free for personal use."
@@ -624,7 +644,7 @@ msgstr ""
 "HomeMesh może ustawić Tailscale za ciebie: zainstaluje go, włączy i otworzy "
 "stronę logowania w przeglądarce. Tailscale jest darmowy do użytku osobistego."
 
-#: homemesh/gui.py:284
+#: homemesh/gui.py:290
 msgid ""
 "Do the same on each of your computers and log in with the same account. "
 "While they are at home, they exchange their VPN addresses by themselves."
@@ -632,7 +652,7 @@ msgstr ""
 "Zrób to samo na każdym komputerze i zaloguj się tym samym kontem. Gdy "
 "komputery są w domu, same wymieniają się adresami VPN."
 
-#: homemesh/gui.py:287
+#: homemesh/gui.py:293
 msgid ""
 "Already using NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? HomeMesh "
 "finds them by itself; there is nothing to set up."
@@ -640,19 +660,19 @@ msgstr ""
 "Masz już NetBird, ZeroTier, Yggdrasil, Nebula albo WireGuard? HomeMesh sam "
 "je wykrywa; nie trzeba nic ustawiać."
 
-#: homemesh/gui.py:296
+#: homemesh/gui.py:302
 msgid "Open the page again"
 msgstr "Otwórz stronę ponownie"
 
-#: homemesh/gui.py:317
+#: homemesh/gui.py:323
 msgid "Set up Tailscale"
 msgstr "Ustaw Tailscale"
 
-#: homemesh/gui.py:345
+#: homemesh/gui.py:351
 msgid "Installing and starting Tailscale…"
 msgstr "Instaluję i uruchamiam Tailscale…"
 
-#: homemesh/gui.py:346
+#: homemesh/gui.py:352
 msgid ""
 "If a window asks for the administrator password, enter it. Downloading "
 "Tailscale can take a minute."
@@ -660,11 +680,11 @@ msgstr ""
 "Jeśli pojawi się okno z hasłem administratora, wpisz je. Pobieranie "
 "Tailscale może potrwać minutę."
 
-#: homemesh/gui.py:354
+#: homemesh/gui.py:360
 msgid "Approve this computer"
 msgstr "Zatwierdź ten komputer"
 
-#: homemesh/gui.py:355
+#: homemesh/gui.py:361
 msgid ""
 "Your Tailscale network wants new computers approved. The admin page has "
 "opened in your browser."
@@ -672,11 +692,11 @@ msgstr ""
 "Twoja sieć Tailscale wymaga zatwierdzania nowych komputerów. Strona "
 "administracyjna otworzyła się w przeglądarce."
 
-#: homemesh/gui.py:358
+#: homemesh/gui.py:364
 msgid "Log in to Tailscale in your browser"
 msgstr "Zaloguj się do Tailscale w przeglądarce"
 
-#: homemesh/gui.py:359
+#: homemesh/gui.py:365
 msgid ""
 "The login page has opened in your browser. Use the same account on all your "
 "computers. This window carries on by itself once you have logged in."
@@ -684,36 +704,36 @@ msgstr ""
 "Strona logowania otworzyła się w przeglądarce. Na wszystkich komputerach "
 "użyj tego samego konta. Po zalogowaniu to okno samo dokończy resztę."
 
-#: homemesh/gui.py:381
+#: homemesh/gui.py:387
 msgid "Tailscale is on"
 msgstr "Tailscale działa"
 
-#: homemesh/gui.py:382
+#: homemesh/gui.py:388
 #, python-brace-format
 msgid "This computer is reachable through {vpn}."
 msgstr "Ten komputer jest dostępny przez {vpn}."
 
-#: homemesh/gui.py:389
+#: homemesh/gui.py:395
 msgid "Tailscale is not set up"
 msgstr "Nie udało się ustawić Tailscale"
 
-#: homemesh/gui.py:400
+#: homemesh/gui.py:406
 msgid "Try again"
 msgstr "Spróbuj ponownie"
 
-#: homemesh/gui.py:407
+#: homemesh/gui.py:413
 msgid "What to share"
 msgstr "Co udostępniać"
 
-#: homemesh/gui.py:411 homemesh/share.py:160
+#: homemesh/gui.py:419 homemesh/share.py:162
 msgid "The whole home folder"
 msgstr "Cały katalog domowy"
 
-#: homemesh/gui.py:412
+#: homemesh/gui.py:420
 msgid "Only chosen folders"
 msgstr "Tylko wybrane foldery"
 
-#: homemesh/gui.py:416
+#: homemesh/gui.py:424
 msgid ""
 "Paired computers get the same access as you: they see and change everything, "
 "settings and keys included."
@@ -721,7 +741,7 @@ msgstr ""
 "Połączone komputery mają taki dostęp jak ty: widzą i zmieniają wszystko, "
 "łącznie z ustawieniami i kluczami."
 
-#: homemesh/gui.py:418
+#: homemesh/gui.py:426
 msgid ""
 "Paired computers see only these folders. The rest of your home folder, your "
 "settings and your keys are invisible to them."
@@ -729,54 +749,55 @@ msgstr ""
 "Połączone komputery widzą tylko te foldery. Reszta katalogu domowego, "
 "ustawienia i klucze są dla nich niewidoczne."
 
-#: homemesh/gui.py:420
-msgid "Needs the bubblewrap package."
-msgstr "Potrzebny jest pakiet bubblewrap."
+#: homemesh/gui.py:428
+#, python-brace-format
+msgid "Needs: {packages}."
+msgstr "Potrzeba: {packages}."
 
-#: homemesh/gui.py:426
+#: homemesh/gui.py:434
 msgid "No folder chosen yet."
 msgstr "Nie wybrano jeszcze żadnego folderu."
 
-#: homemesh/gui.py:428
+#: homemesh/gui.py:436
 msgid "Add folder…"
 msgstr "Dodaj folder…"
 
-#: homemesh/gui.py:431
+#: homemesh/gui.py:439
 msgid "What paired computers see"
 msgstr "Co widzą połączone komputery"
 
-#: homemesh/gui.py:434
+#: homemesh/gui.py:449
 msgid "Save"
 msgstr "Zapisz"
 
-#: homemesh/gui.py:446
+#: homemesh/gui.py:461
 msgid "Read-only"
 msgstr "Tylko odczyt"
 
-#: homemesh/gui.py:449
+#: homemesh/gui.py:464
 msgid "Remove from the list"
 msgstr "Usuń z listy"
 
-#: homemesh/gui.py:464
+#: homemesh/gui.py:479
 msgid "Choose a folder to share"
 msgstr "Wybierz folder do udostępnienia"
 
-#: homemesh/gui.py:490
+#: homemesh/gui.py:509
 #, python-brace-format
 msgid "Pairing with {name}"
 msgstr "Łączenie z {name}"
 
-#: homemesh/gui.py:491
+#: homemesh/gui.py:510
 #, python-brace-format
 msgid "{name} wants to pair"
 msgstr "{name} chce się połączyć"
 
-#: homemesh/gui.py:503
+#: homemesh/gui.py:522
 #, python-brace-format
 msgid "Connecting to {name}…"
 msgstr "Łączenie z {name}…"
 
-#: homemesh/gui.py:510
+#: homemesh/gui.py:529
 msgid ""
 "Paired computers have full access to each other's home folders. Pair only "
 "your own computers."
@@ -784,7 +805,7 @@ msgstr ""
 "Połączone komputery mają pełny dostęp do swoich katalogów domowych. Łącz "
 "tylko własne komputery."
 
-#: homemesh/gui.py:533
+#: homemesh/gui.py:552
 #, python-brace-format
 msgid ""
 "Check that {name} shows the same code. If it does, click “Matches” on both "
@@ -793,25 +814,25 @@ msgstr ""
 "Sprawdź, czy na komputerze {name} widać ten sam kod. Jeśli tak, kliknij "
 "„Zgadza się” na obu komputerach."
 
-#: homemesh/gui.py:538
+#: homemesh/gui.py:557
 msgid "Does not match"
 msgstr "Nie zgadza się"
 
-#: homemesh/gui.py:539
+#: homemesh/gui.py:558
 msgid "Matches"
 msgstr "Zgadza się"
 
-#: homemesh/gui.py:552
+#: homemesh/gui.py:571
 #, python-brace-format
 msgid "{name} says the code matches."
 msgstr "Na komputerze {name} kod się zgadza."
 
-#: homemesh/gui.py:559
+#: homemesh/gui.py:578
 #, python-brace-format
 msgid "Paired with {name}"
 msgstr "Połączono z {name}"
 
-#: homemesh/gui.py:560
+#: homemesh/gui.py:579
 #, python-brace-format
 msgid ""
 "The home folder of {name} is now in your file manager's sidebar. The other "
@@ -820,83 +841,83 @@ msgstr ""
 "Katalog domowy komputera {name} jest teraz w panelu bocznym menedżera "
 "plików. Pozostałe komputery z grupy dowiedzą się o nim same."
 
-#: homemesh/gui.py:567 homemesh/gui.py:622
+#: homemesh/gui.py:586 homemesh/gui.py:641
 msgid "Open"
 msgstr "Otwórz"
 
-#: homemesh/gui.py:574
+#: homemesh/gui.py:593
 msgid "Not paired"
 msgstr "Nie połączono"
 
-#: homemesh/gui.py:625
+#: homemesh/gui.py:644
 msgid "More"
 msgstr "Więcej"
 
-#: homemesh/gui.py:628
+#: homemesh/gui.py:647
 msgid "Connect at login"
 msgstr "Podłączaj po zalogowaniu"
 
-#: homemesh/gui.py:630
+#: homemesh/gui.py:649
 msgid "Remove from the group…"
 msgstr "Usuń z grupy…"
 
-#: homemesh/gui.py:644
+#: homemesh/gui.py:663
 msgid "checking…"
 msgstr "sprawdzam…"
 
-#: homemesh/gui.py:646
+#: homemesh/gui.py:665
 msgid "reachable on the local network"
 msgstr "dostępny w sieci lokalnej"
 
-#: homemesh/gui.py:648
+#: homemesh/gui.py:667
 msgid "reachable through VPN"
 msgstr "dostępny przez VPN"
 
-#: homemesh/gui.py:658
+#: homemesh/gui.py:677
 msgid "ready to pair"
 msgstr "gotowy do połączenia"
 
-#: homemesh/gui.py:658
+#: homemesh/gui.py:677
 msgid "sharing is off"
 msgstr "udostępnianie wyłączone"
 
-#: homemesh/gui.py:663
+#: homemesh/gui.py:682
 msgid "Connect"
 msgstr "Połącz"
 
-#: homemesh/gui.py:688
+#: homemesh/gui.py:709
 msgid "Sync the group now"
 msgstr "Uzgodnij grupę teraz"
 
-#: homemesh/gui.py:689
+#: homemesh/gui.py:710
 msgid "About"
 msgstr "O programie"
 
-#: homemesh/gui.py:691
+#: homemesh/gui.py:712
 msgid "Menu"
 msgstr "Menu"
 
-#: homemesh/gui.py:698 homemesh/gui.py:1257
+#: homemesh/gui.py:719 homemesh/gui.py:1306
 msgid "Sharing"
 msgstr "Udostępnianie"
 
-#: homemesh/gui.py:712
+#: homemesh/gui.py:733
 msgid "What other computers see"
 msgstr "Co widzą inne komputery"
 
-#: homemesh/gui.py:717
+#: homemesh/gui.py:738
 msgid "Change…"
 msgstr "Zmień…"
 
-#: homemesh/gui.py:726 homemesh/gui.py:883
+#: homemesh/gui.py:747 homemesh/gui.py:904
 msgid "Set up…"
 msgstr "Ustaw…"
 
-#: homemesh/gui.py:732
+#: homemesh/gui.py:753
 msgid "At login"
 msgstr "Po zalogowaniu"
 
-#: homemesh/gui.py:733
+#: homemesh/gui.py:754
 msgid ""
 "Sync the group and connect the computers marked “Connect at login”. Sharing "
 "works without this too."
@@ -904,50 +925,50 @@ msgstr ""
 "Uzgadniaj grupę i podłączaj komputery oznaczone „Podłączaj po zalogowaniu”. "
 "Udostępnianie działa także bez tego."
 
-#: homemesh/gui.py:745
+#: homemesh/gui.py:766
 msgid "None yet. Pair with a computer from the list below."
 msgstr "Jeszcze żadnego. Połącz się z komputerem z listy poniżej."
 
-#: homemesh/gui.py:750
+#: homemesh/gui.py:771
 msgid "Looking for computers with HomeMesh open on this network…"
 msgstr "Szukam komputerów z otwartym HomeMesh w tej sieci…"
 
-#: homemesh/gui.py:757
+#: homemesh/gui.py:778
 msgid "This computer"
 msgstr "Ten komputer"
 
-#: homemesh/gui.py:758
+#: homemesh/gui.py:779
 msgid "Paired computers"
 msgstr "Połączone komputery"
 
-#: homemesh/gui.py:759
+#: homemesh/gui.py:780
 msgid "Nearby"
 msgstr "W pobliżu"
 
-#: homemesh/gui.py:793
+#: homemesh/gui.py:814
 #, python-brace-format
 msgid "Cannot accept pairing requests: {error}"
 msgstr "Nie mogę przyjmować połączeń: {error}"
 
-#: homemesh/gui.py:797
+#: homemesh/gui.py:818
 #, python-brace-format
 msgid "Cannot look for computers on the network: {error}"
 msgstr "Nie mogę szukać komputerów w sieci: {error}"
 
-#: homemesh/gui.py:868
+#: homemesh/gui.py:889
 msgid "Sharing is off. Other computers have no access here."
 msgstr "Udostępnianie wyłączone. Inne komputery nie mają tu dostępu."
 
-#: homemesh/gui.py:870
+#: homemesh/gui.py:891
 msgid "Sharing is on, but the SSH server is not running."
 msgstr "Udostępnianie włączone, ale serwer SSH nie działa."
 
-#: homemesh/gui.py:872
+#: homemesh/gui.py:893
 #, python-brace-format
 msgid "Sharing is on. Other computers see it as {name}.local."
 msgstr "Udostępnianie włączone. Inne komputery widzą go jako {name}.local."
 
-#: homemesh/gui.py:877
+#: homemesh/gui.py:898
 #, python-brace-format
 msgid ""
 "Reachable through {vpn}. Paired computers that also have a VPN can open this "
@@ -956,11 +977,11 @@ msgstr ""
 "Dostępny przez {vpn}. Połączone komputery, które też mają VPN, otworzą ten "
 "komputer także spoza domu."
 
-#: homemesh/gui.py:879
+#: homemesh/gui.py:900
 msgid "How does it work?"
 msgstr "Jak to działa?"
 
-#: homemesh/gui.py:881
+#: homemesh/gui.py:902
 msgid ""
 "Only on the local network. HomeMesh can set up Tailscale, so that your "
 "computers reach each other from anywhere."
@@ -968,21 +989,46 @@ msgstr ""
 "Tylko w sieci lokalnej. HomeMesh może ustawić Tailscale, żeby komputery "
 "łączyły się ze sobą z każdego miejsca."
 
-#: homemesh/gui.py:901
+#: homemesh/gui.py:922
+msgid "Installing packages…"
+msgstr "Instaluję pakiety…"
+
+#: homemesh/gui.py:923
+msgid ""
+"If a window asks for the administrator password, enter it. Installing can "
+"take a minute."
+msgstr ""
+"Jeśli pojawi się okno z prośbą o hasło administratora, wpisz je. Instalacja "
+"może potrwać minutę."
+
+#: homemesh/gui.py:926
 msgid "One moment…"
 msgstr "Chwileczkę…"
 
-#: homemesh/gui.py:902
+#: homemesh/gui.py:927
 msgid ""
 "Changing settings. If a window asks for the administrator password, enter it."
 msgstr ""
 "Zmieniam ustawienia. Jeśli pojawi się okno z hasłem administratora, wpisz je."
 
-#: homemesh/gui.py:904
+#: homemesh/gui.py:929
+msgid "Some needed packages are missing"
+msgstr "Brakuje potrzebnych pakietów"
+
+#: homemesh/gui.py:930
+#, python-brace-format
+msgid ""
+"Missing: {packages}. HomeMesh can install them and turn sharing on. You will "
+"be asked for the administrator password."
+msgstr ""
+"Brakuje: {packages}. HomeMesh może je zainstalować i włączyć udostępnianie. "
+"Zapyta o hasło administratora."
+
+#: homemesh/gui.py:934
 msgid "Step 1 of 3: turn sharing on"
 msgstr "Krok 1 z 3: włącz udostępnianie"
 
-#: homemesh/gui.py:905
+#: homemesh/gui.py:935
 msgid ""
 "This lets your other computers open this computer's home folder. You will be "
 "asked for the administrator password."
@@ -990,52 +1036,52 @@ msgstr ""
 "Dzięki temu inne twoje komputery będą mogły otworzyć katalog domowy tego "
 "komputera. Komputer zapyta o hasło administratora."
 
-#: homemesh/gui.py:906
+#: homemesh/gui.py:936
 msgid "Turn on"
 msgstr "Włącz"
 
-#: homemesh/gui.py:908
+#: homemesh/gui.py:938
 msgid "The SSH server is not running"
 msgstr "Serwer SSH nie działa"
 
-#: homemesh/gui.py:909 homemesh/gui.py:914
+#: homemesh/gui.py:939 homemesh/gui.py:944
 msgid "Fix"
 msgstr "Napraw"
 
-#: homemesh/gui.py:909
+#: homemesh/gui.py:939
 msgid "Without it, other computers cannot open this computer."
 msgstr "Bez niego inne komputery nie otworzą tego komputera."
 
-#: homemesh/gui.py:911
+#: homemesh/gui.py:941
 msgid "Other computers cannot find this one by name"
 msgstr "Inne komputery nie znajdą tego po nazwie"
 
-#: homemesh/gui.py:913
+#: homemesh/gui.py:943
 #, python-brace-format
 msgid "mDNS, which answers to {name}.local, is missing or turned off."
 msgstr ""
 "mDNS, które odpowiada na nazwę {name}.local, nie jest zainstalowane albo "
 "jest wyłączone."
 
-#: homemesh/gui.py:916
+#: homemesh/gui.py:946
 #, python-brace-format
 msgid "Two computers are called “{name}”"
 msgstr "Dwa komputery nazywają się „{name}”"
 
-#: homemesh/gui.py:917
+#: homemesh/gui.py:947
 msgid ""
 "Computers on a network need different names. Give this one another name."
 msgstr "Komputery w sieci muszą mieć różne nazwy. Nadaj temu komputerowi inną."
 
-#: homemesh/gui.py:918
+#: homemesh/gui.py:948
 msgid "Rename"
 msgstr "Zmień nazwę"
 
-#: homemesh/gui.py:920
+#: homemesh/gui.py:950
 msgid "Step 3 of 3: pair the computers"
 msgstr "Krok 3 z 3: połącz komputery"
 
-#: homemesh/gui.py:921
+#: homemesh/gui.py:951
 msgid ""
 "Click “Connect” next to a computer below and compare the codes on both "
 "screens."
@@ -1043,20 +1089,20 @@ msgstr ""
 "Kliknij „Połącz” przy nazwie komputera poniżej i porównaj kody na obu "
 "ekranach."
 
-#: homemesh/gui.py:923
+#: homemesh/gui.py:953
 msgid "Step 2 of 3: enable sharing on the other computer"
 msgstr "Krok 2 z 3: włącz udostępnianie na drugim komputerze"
 
-#: homemesh/gui.py:924
+#: homemesh/gui.py:954
 #, python-brace-format
 msgid "On {name}, click “Turn on” in HomeMesh."
 msgstr "Na komputerze {name} kliknij „Włącz” w HomeMesh."
 
-#: homemesh/gui.py:926
+#: homemesh/gui.py:956
 msgid "Step 2 of 3: open HomeMesh on the other computer"
 msgstr "Krok 2 z 3: otwórz HomeMesh na drugim komputerze"
 
-#: homemesh/gui.py:927
+#: homemesh/gui.py:957
 msgid ""
 "Install and start HomeMesh on another computer on the same network. It will "
 "appear below, under “Nearby”."
@@ -1064,32 +1110,41 @@ msgstr ""
 "Zainstaluj i uruchom HomeMesh na innym komputerze w tej samej sieci. Pojawi "
 "się poniżej, w sekcji „W pobliżu”."
 
-#: homemesh/gui.py:930
+#: homemesh/gui.py:960
+msgid "Log out and back in"
+msgstr "Wyloguj się i zaloguj ponownie"
+
+#: homemesh/gui.py:961
+msgid "After that, your file manager can open the paired computers."
+msgstr "Potem menedżer plików otworzy połączone komputery."
+
+#: homemesh/gui.py:963
 msgid "Your file manager cannot open the paired computers"
 msgstr "Menedżer plików nie otworzy połączonych komputerów"
 
-#: homemesh/gui.py:932
+#: homemesh/gui.py:965
+#, python-brace-format
 msgid ""
-"Install the gvfs package (for Nautilus, Nemo, Thunar and Caja), then log out "
-"and back in."
+"Missing: {packages}. HomeMesh can install it. You will be asked for the "
+"administrator password."
 msgstr ""
-"Zainstaluj pakiet gvfs (dla Nautilusa, Nemo, Thunara i Caja), potem uruchom "
-"ponownie sesję."
+"Brakuje: {packages}. HomeMesh może to zainstalować. Zapyta o hasło "
+"administratora."
 
-#: homemesh/gui.py:935
+#: homemesh/gui.py:969
 msgid "Another computer is nearby"
 msgstr "W pobliżu jest kolejny komputer"
 
-#: homemesh/gui.py:936
+#: homemesh/gui.py:970
 #, python-brace-format
 msgid "Click “Connect” to add {name} to the group."
 msgstr "Kliknij „Połącz”, żeby dołączyć {name} do grupy."
 
-#: homemesh/gui.py:938
+#: homemesh/gui.py:972
 msgid "All set"
 msgstr "Gotowe"
 
-#: homemesh/gui.py:939
+#: homemesh/gui.py:973
 msgid ""
 "Paired computers are in your file manager's sidebar. A new computer only "
 "needs pairing with one of them: the others learn about it by themselves."
@@ -1097,24 +1152,24 @@ msgstr ""
 "Połączone komputery są w panelu bocznym menedżera plików. Nowy komputer "
 "wystarczy połączyć z dowolnym z nich: pozostałe dowiedzą się o nim same."
 
-#: homemesh/gui.py:986
+#: homemesh/gui.py:1023
 msgid "Already syncing…"
 msgstr "Już uzgadniam…"
 
-#: homemesh/gui.py:986
+#: homemesh/gui.py:1023
 msgid "No paired computers."
 msgstr "Brak połączonych komputerów."
 
-#: homemesh/gui.py:1000
+#: homemesh/gui.py:1037
 #, python-brace-format
 msgid "Synced with {n} of {total} computers."
 msgstr "Uzgodniono z {n} z {total} komputerów."
 
-#: homemesh/gui.py:1013
+#: homemesh/gui.py:1050
 msgid "Turn sharing off?"
 msgstr "Wyłączyć udostępnianie?"
 
-#: homemesh/gui.py:1014
+#: homemesh/gui.py:1051
 msgid ""
 "Paired computers lose access to this computer. The group stays: turn sharing "
 "back on and everything works as before."
@@ -1122,70 +1177,70 @@ msgstr ""
 "Połączone komputery stracą dostęp do tego komputera. Grupa zostaje: po "
 "ponownym włączeniu wszystko zadziała jak wcześniej."
 
-#: homemesh/gui.py:1016
+#: homemesh/gui.py:1053
 msgid "Turn off"
 msgstr "Wyłącz"
 
-#: homemesh/gui.py:1020
+#: homemesh/gui.py:1057 homemesh/gui.py:1060
 msgid "Sharing is on."
 msgstr "Udostępnianie włączone."
 
-#: homemesh/gui.py:1050
+#: homemesh/gui.py:1095
 msgid "Saved. Other computers have to open this computer again."
 msgstr "Zapisano. Inne komputery muszą otworzyć ten komputer ponownie."
 
-#: homemesh/gui.py:1052
+#: homemesh/gui.py:1097
 msgid "Saved."
 msgstr "Zapisano."
 
-#: homemesh/gui.py:1071 homemesh/tailscale.py:116
+#: homemesh/gui.py:1119 homemesh/tailscale.py:116
 msgid "Not everything worked"
 msgstr "Nie wszystko się udało"
 
-#: homemesh/gui.py:1073
+#: homemesh/gui.py:1122
 msgid "That did not work."
 msgstr "Nie udało się."
 
-#: homemesh/gui.py:1088
+#: homemesh/gui.py:1137
 msgid "Already pairing with another computer."
 msgstr "Trwa już łączenie z innym komputerem."
 
-#: homemesh/gui.py:1139
+#: homemesh/gui.py:1188
 #, python-brace-format
 msgid "Opening {name}…"
 msgstr "Otwieram {name}…"
 
-#: homemesh/gui.py:1153
+#: homemesh/gui.py:1202
 #, python-brace-format
 msgid "Could not open {name}: {error}"
 msgstr "Nie udało się otworzyć {name}: {error}"
 
-#: homemesh/gui.py:1199
+#: homemesh/gui.py:1248
 #, python-brace-format
-msgid "Cannot open {uri}. Install gvfs."
-msgstr "Nie umiem otworzyć {uri}. Zainstaluj gvfs."
+msgid "No file manager could open {uri}."
+msgstr "Żaden menedżer plików nie otworzył {uri}."
 
-#: homemesh/gui.py:1206
+#: homemesh/gui.py:1255
 #, python-brace-format
 msgid "{name} will be connected at login."
 msgstr "{name} będzie podłączany po zalogowaniu."
 
-#: homemesh/gui.py:1207
+#: homemesh/gui.py:1256
 #, python-brace-format
 msgid "{name} will not be connected at login."
 msgstr "{name} nie będzie podłączany po zalogowaniu."
 
-#: homemesh/gui.py:1220
+#: homemesh/gui.py:1269
 #, python-brace-format
 msgid "Removed {name} from the group."
 msgstr "Usunięto {name} z grupy."
 
-#: homemesh/gui.py:1222
+#: homemesh/gui.py:1271
 #, python-brace-format
 msgid "Remove {name} from the group?"
 msgstr "Usunąć {name} z grupy?"
 
-#: homemesh/gui.py:1223
+#: homemesh/gui.py:1272
 #, python-brace-format
 msgid ""
 "{name} loses access to this computer, and the other computers in the group "
@@ -1194,11 +1249,11 @@ msgstr ""
 "Komputer {name} straci dostęp do tego komputera, a pozostałe komputery w "
 "grupie dowiedzą się o tym przy najbliższym uzgadnianiu."
 
-#: homemesh/gui.py:1225
+#: homemesh/gui.py:1274
 msgid "Remove"
 msgstr "Usuń"
 
-#: homemesh/gui.py:1341
+#: homemesh/gui.py:1390
 msgid "The home folders of your computers in your file manager."
 msgstr "Katalogi domowe twoich komputerów w menedżerze plików."
 
@@ -1284,32 +1339,36 @@ msgstr ""
 "Dane od drugiego komputera się nie zgadzają: ktoś mógł się pod niego "
 "podszyć. Przerwano."
 
-#: homemesh/share.py:149
+#: homemesh/share.py:151
 msgid "HomeMesh: the bubblewrap package is missing, so nothing is shared.\n"
 msgstr "HomeMesh: brak pakietu bubblewrap, więc nic nie jest udostępniane.\n"
 
-#: homemesh/share.py:154
+#: homemesh/share.py:156
 msgid "HomeMesh: this computer shares only chosen folders, over SFTP.\n"
 msgstr "HomeMesh: ten komputer udostępnia tylko wybrane foldery, przez SFTP.\n"
 
-#: homemesh/share.py:162
+#: homemesh/share.py:164
 msgid "Nothing (no folder chosen)"
 msgstr "Nic (żaden folder nie jest wybrany)"
 
-#: homemesh/share.py:166
+#: homemesh/share.py:168
 msgid "read-only"
 msgstr "tylko odczyt"
 
-#: homemesh/share.py:166
+#: homemesh/share.py:168
 msgid "read-write"
 msgstr "odczyt i zapis"
 
-#: homemesh/system.py:130
+#: homemesh/system.py:73
+msgid "SSH server (openssh)"
+msgstr "serwer SSH (openssh)"
+
+#: homemesh/system.py:158
 msgid ""
 "pkexec is missing (polkit package). In a terminal run: sudo homemesh enable"
 msgstr "Brak pkexec (pakiet polkit). Uruchom w terminalu: sudo homemesh enable"
 
-#: homemesh/system.py:147
+#: homemesh/system.py:175
 #, python-brace-format
 msgid ""
 "No window to ask for the administrator password (polkit agent). In a "
@@ -1318,7 +1377,7 @@ msgstr ""
 "Brak okna logowania administratora (agenta polkit). Uruchom w terminalu: "
 "sudo homemesh {cmd}"
 
-#: homemesh/system.py:150
+#: homemesh/system.py:178
 msgid "Administrator permission was not given."
 msgstr "Nie udzielono uprawnień administratora."
 

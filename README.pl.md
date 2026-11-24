@@ -78,7 +78,10 @@ Z kopii repozytorium:
 Wymaga `openssh`, `python-gobject`, `gtk4` i `polkit`. Opcjonalnie: `gvfs` dla
 menedżerów plików GTK, `kio-extras` dla Dolphina, `bubblewrap` do udostępniania
 tylko wybranych folderów, `avahi` i `nss-mdns` dla adresów `nazwa.local` w
-systemach bez systemd-resolved.
+systemach bez systemd-resolved. Gdy czegoś brakuje, HomeMesh pokazuje przycisk
+*Zainstaluj brakujące pakiety* i instaluje je menedżerem pakietów twojej
+dystrybucji (pacman, apt, dnf, zypper, xbps albo apk); w terminalu najpierw
+pyta, albo `homemesh enable --install`.
 
 ## Jak zacząć
 

@@ -206,9 +206,10 @@ def confirm(parent, title, text, action, callback):
 
 
 class StepsDialog(Dialog):
-    """What the root helper did, when something failed."""
+    """What the root helper did, when something failed. install: called to
+    install what is missing."""
 
-    def __init__(self, parent, result, title):
+    def __init__(self, parent, result, title, install=None):
         super().__init__(parent, title, 480)
         self.content(label(title, "big", wrap=True))
         for item in result.steps:
@@ -218,7 +219,12 @@ class StepsDialog(Dialog):
             self.content(hbox(10, icon, label(system.step_text(item), wrap=True, chars=50)))
         if result.error:
             self.content(label(result.error, wrap=True))
-        self.add_button(_("Close"), self.close, "suggested-action")
+        if not install:
+            self.add_button(_("Close"), self.close, "suggested-action")
+            return
+        self.add_button(_("Close"), self.close)
+        self.set_focus(self.add_button(_("Install missing packages"), lambda: (self.close(), install()),
+                                       "suggested-action"))
 
 
 class RenameDialog(Dialog):
@@ -405,9 +411,11 @@ class ShareDialog(Dialog):
 
     def __init__(self, parent, current, callback):
         super().__init__(parent, _("What to share"), 540)
+        self.window = parent
         self.callback = callback
         self.folders = [dict(folder) for folder in current["folders"]]
-        available = share.sandbox_available()
+        self.missing = share.sandbox_missing()
+        available = not self.missing
         self.home = Gtk.CheckButton(label=_("The whole home folder"))
         self.chosen = Gtk.CheckButton(label=_("Only chosen folders"), group=self.home)
         self.home.set_active(current["mode"] == "home" or not available)
@@ -417,8 +425,8 @@ class ShareDialog(Dialog):
                             "everything, settings and keys included."), "dim", "small", wrap=True)
         chosen_note = label(_("Paired computers see only these folders. The rest of your home "
                               "folder, your settings and your keys are invisible to them.")
-                            + ("" if available else "\n" + _("Needs the bubblewrap package.")),
-                            "dim", "small", wrap=True)
+                            + ("" if available else "\n" + _("Needs: {packages}.").format(
+                                packages=system.thing_names(self.missing))), "dim", "small", wrap=True)
         for note in (home_note, chosen_note):
             note.set_margin_start(28)
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
@@ -429,7 +437,14 @@ class ShareDialog(Dialog):
         self.pick.set_halign(Gtk.Align.START)
         self.pick.set_margin_start(28)
         self.content(label(_("What paired computers see"), "big"),
-                     self.home, home_note, self.chosen, chosen_note, self.list, self.pick)
+                     self.home, home_note, self.chosen, chosen_note)
+        if available:
+            self.content(self.list, self.pick)
+        else:
+            install = button(_("Install missing packages"), self._install)
+            install.set_halign(Gtk.Align.START)
+            install.set_margin_start(28)
+            self.content(install)
         self.add_button(_("Cancel"), self.close)
         self.save = self.add_button(_("Save"), self._save, "suggested-action")
         self.home.connect("toggled", lambda *_a: self._update())
@@ -477,6 +492,10 @@ class ShareDialog(Dialog):
         if all(f["path"] != path for f in self.folders):
             self.folders.append({"path": path, "readonly": False})
         self._rebuild()
+
+    def _install(self):
+        self.close()
+        self.window.run_helper(["install", *self.missing], _("Installed."), then=self.window.ask_share)
 
     def _save(self):
         self.close()
@@ -672,7 +691,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.st = state.new_state()
         self.configured = self.running = False
         self.mdns_ok, self.mdns_how = True, None
+        self.missing = []
         self.gvfs = system.gvfs_sftp()
+        self.gvfs_installed = False  # by us, but the session does not know it yet
         self.online = {}
         self.nearby = []
         self.peer_rows = {}
@@ -680,7 +701,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.pair_lock = threading.Lock()
         self.syncing = False
         self.discovery = self.server = None
-        self.helper_busy = False
+        self.helper_busy = self.installing = False
         self.tunnels = []
 
         header = Gtk.HeaderBar()
@@ -897,9 +918,18 @@ class MainWindow(Gtk.ApplicationWindow):
                 [p for p in self.st["peers"].values() if p["name"] == name]
         peers = self.st["peers"]
         hint = self.hint.set
-        if self.helper_busy:
+        if self.helper_busy and self.installing:
+            hint("step", "content-loading-symbolic", _("Installing packages…"),
+                 _("If a window asks for the administrator password, enter it. Installing can take a "
+                   "minute."))
+        elif self.helper_busy:
             hint("step", "content-loading-symbolic", _("One moment…"),
                  _("Changing settings. If a window asks for the administrator password, enter it."))
+        elif self.missing:
+            hint("problem", "dialog-warning-symbolic", _("Some needed packages are missing"),
+                 _("Missing: {packages}. HomeMesh can install them and turn sharing on. You will be asked "
+                   "for the administrator password.").format(packages=system.thing_names(self.missing)),
+                 _("Install missing packages"), self.install_and_enable)
         elif not self.configured:
             hint("step", "go-next-symbolic", _("Step 1 of 3: turn sharing on"),
                  _("This lets your other computers open this computer's home folder. You will be "
@@ -926,11 +956,15 @@ class MainWindow(Gtk.ApplicationWindow):
             hint("step", "go-next-symbolic", _("Step 2 of 3: open HomeMesh on the other computer"),
                  _("Install and start HomeMesh on another computer on the same network. It will "
                    "appear below, under “Nearby”."))
+        elif not self.gvfs and not system.kde() and self.gvfs_installed:
+            hint("step", "go-next-symbolic", _("Log out and back in"),
+                 _("After that, your file manager can open the paired computers."))
         elif not self.gvfs and not system.kde():
             hint("problem", "dialog-warning-symbolic", _("Your file manager cannot open the paired "
                                                          "computers"),
-                 _("Install the gvfs package (for Nautilus, Nemo, Thunar and Caja), then log out "
-                   "and back in."))
+                 _("Missing: {packages}. HomeMesh can install it. You will be asked for the administrator "
+                   "password.").format(packages="gvfs"),
+                 _("Install missing packages"), self.install_gvfs)
         elif any(e["ready"] for e in waiting):
             hint("step", "list-add-symbolic", _("Another computer is nearby"),
                  _("Click “Connect” to add {name} to the group.").format(name=waiting[0]["name"]))
@@ -943,12 +977,15 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def check_system(self):
         def work():
-            info = (system.sharing_configured(), system.sshd_running(), system.mdns(), vpn.addresses())
+            mdns = system.mdns()
+            info = (system.sharing_configured(), system.sshd_running(), mdns, vpn.addresses(),
+                    system.missing(mdns[0]))
             idle(self._system_checked, *info)
         threading.Thread(target=work, daemon=True).start()
 
-    def _system_checked(self, configured, running, mdns, tunnels):
+    def _system_checked(self, configured, running, mdns, tunnels, missing):
         self.configured, self.running, self.tunnels = configured, running, tunnels
+        self.missing = missing
         self.mdns_ok, self.mdns_how = mdns
         self.update_this()
         self.refresh_nearby()
@@ -1019,6 +1056,14 @@ class MainWindow(Gtk.ApplicationWindow):
     def enable(self):
         self.run_helper(["enable"], _("Sharing is on."))
 
+    def install_and_enable(self):
+        self.run_helper(["enable", "--install"], _("Sharing is on."))
+
+    def install_gvfs(self):
+        def then():
+            self.gvfs_installed = True
+        self.run_helper(["install", "gvfs"], _("Installed."), then)
+
     def _login_changed(self, switch, wanted):
         if self._switch_guard:
             return False
@@ -1051,24 +1096,28 @@ class MainWindow(Gtk.ApplicationWindow):
         else:
             self.toast(_("Saved."))
 
-    def run_helper(self, args, done_text):
+    def run_helper(self, args, done_text, then=None):
         if self.helper_busy:
             return
         self.helper_busy = True
+        self.installing = args[0] == "install" or "--install" in args
         self.update_this()
         self.update_hint()
 
         def work():
             result = system.run_helper(args)
-            idle(self._helper_done, result, done_text)
+            idle(self._helper_done, result, done_text, then)
         threading.Thread(target=work, daemon=True).start()
 
-    def _helper_done(self, result, done_text):
+    def _helper_done(self, result, done_text, then):
         self.helper_busy = False
         if result.ok:
             self.toast(done_text)
+            if then:
+                then()
         elif result.steps:
-            StepsDialog(self, result, _("Not everything worked")).present()
+            StepsDialog(self, result, _("Not everything worked"),
+                        self.install_and_enable if result.missing else None).present()
         else:
             self.toast(result.error or _("That did not work."))
         self.check_system()
@@ -1196,7 +1245,7 @@ class MainWindow(Gtk.ApplicationWindow):
             if not app or not app.launch_uris([uri], self.get_display().get_app_launch_context()):
                 raise GLib.Error("no file manager")
         except GLib.Error:
-            self.toast(_("Cannot open {uri}. Install gvfs.").format(uri=uri))
+            self.toast(_("No file manager could open {uri}.").format(uri=uri))
 
     def set_automount(self, pid, on):
         with state.transaction() as st:
