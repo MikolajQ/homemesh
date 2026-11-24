@@ -161,7 +161,9 @@ Pomocnik:
 - uruchamia go przy starcie systemu, z systemd, OpenRC, runit, s6 albo dinit;
 - otwiera zaporę (ufw albo firewalld) dla sieci lokalnej: 22/tcp, 41753/udp i
   41753–41762/tcp, a na interfejsach VPN samo SSH;
-- włącza mDNS, jeśli `nazwa.local` jeszcze nie działa.
+- włącza mDNS, jeśli `nazwa.local` jeszcze nie działa: w systemd-resolved
+  (`/etc/systemd/resolved.conf.d/zz-homemesh-mdns.conf`; jako ostatni plik
+  nadpisuje też wcześniejsze `MulticastDNS=no`), a jeśli się nie da, przez Avahi.
 
 *Wyłącz* przywraca to, co było wcześniej. Ustawianie Tailscale idzie przez
 tego samego pomocnika (patrz [Poza domem](#poza-domem)); wyłączenie

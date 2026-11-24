@@ -36,9 +36,15 @@ ROOT = os.environ["HOMEMESH_HELPER_ROOT"] if TEST else "/"
 
 DROPIN = "/etc/ssh/sshd_config.d/10-homemesh.conf"
 STATE = "/var/lib/homemesh/state.json"
-RESOLVED_DROPIN = "/etc/systemd/resolved.conf.d/10-homemesh-mdns.conf"
-NM_DROPIN = "/etc/NetworkManager/conf.d/10-homemesh-mdns.conf"
+# Both read their files in the order of names and the last setting counts, so
+# these must come after the numbered ones: MulticastDNS=no in someone's
+# 90-dns.conf would otherwise win.
+RESOLVED_DROPIN = "/etc/systemd/resolved.conf.d/zz-homemesh-mdns.conf"
+NM_DROPIN = "/etc/NetworkManager/conf.d/zz-homemesh-mdns.conf"
+OLD_DROPINS = ("/etc/systemd/resolved.conf.d/10-homemesh-mdns.conf",  # up to 0.3.0
+               "/etc/NetworkManager/conf.d/10-homemesh-mdns.conf")
 NSS_MDNS = "mdns_minimal [NOTFOUND=return]"
+MDNS_WAIT = 0 if TEST else 3
 PORT, PORT_SPAN = 41753, 10
 NETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 # VPNs whose addresses are not in the ranges above: only SSH is opened there
@@ -203,6 +209,11 @@ class Init:
         if self.kind == "dinit":
             return os.path.lexists(P(f"/etc/dinit.d/boot.d/{service}"))
         return False
+
+    def masked(self, service):
+        """Turned off for good by the administrator; not ours to undo."""
+        return self.kind == "systemd" and \
+            run("systemctl", "is-enabled", f"{self.name(service)}.service").stdout.strip() == "masked"
 
     def running(self, service):
         service = self.name(service)
@@ -419,6 +430,21 @@ def resolved_mdns_on():
     return bool(re.search(r"^Global: yes$", out, re.M) and re.search(r"^Link .*: yes$", out, re.M))
 
 
+def resolved_mdns_override():
+    """Someone else's MulticastDNS= that keeps mDNS off in systemd-resolved, as
+    {"value", "path"}, or None. Of several, the one that counts: the last."""
+    value = path = current = None
+    for line in run("systemd-analyze", "cat-config", "systemd/resolved.conf").stdout.splitlines():
+        if re.match(r"# /.*/resolved\.conf(\.d/.+\.conf)?$", line):  # cat-config names each file
+            current = line[2:]
+        match = re.match(r"\s*MulticastDNS\s*=\s*(\S+)", line)
+        if match:
+            value, path = match.group(1), current
+    if value is None or path == RESOLVED_DROPIN or value.lower() in ("yes", "true", "on", "1"):
+        return None
+    return {"value": value, "path": path}
+
+
 def default_interface():
     for line in read("/proc/net/route").splitlines()[1:]:
         fields = line.split()
@@ -428,9 +454,9 @@ def default_interface():
 
 
 def nss_mdns_available():
-    return any(os.path.exists(path) for path in ("/usr/lib/libnss_mdns_minimal.so.2",
-                                                  "/usr/lib64/libnss_mdns_minimal.so.2",
-                                                  "/lib/libnss_mdns_minimal.so.2"))
+    return any(os.path.exists(P(path)) for path in ("/usr/lib/libnss_mdns_minimal.so.2",
+                                                     "/usr/lib64/libnss_mdns_minimal.so.2",
+                                                     "/lib/libnss_mdns_minimal.so.2"))
 
 
 def ensure_nss_mdns(state):
@@ -453,6 +479,50 @@ def ensure_nss_mdns(state):
     return True
 
 
+def apply_resolved_settings(init):
+    """Make NetworkManager and systemd-resolved read their files again."""
+    if init.running("NetworkManager"):
+        run("nmcli", "general", "reload", "conf")
+    run("systemctl", "restart", "systemd-resolved.service")
+
+
+def remove_mdns_dropins(init, state):
+    if any([remove(path) for path in state.pop("created", [])]) and \
+            init.kind == "systemd" and init.running("systemd-resolved"):
+        apply_resolved_settings(init)
+
+
+def ensure_resolved_mdns(init, state):
+    """True if systemd-resolved answers to name.local, turning that on if needed."""
+    override = None
+    if not resolved_mdns_on():
+        for path in OLD_DROPINS:
+            remove(path)
+        override = resolved_mdns_override()
+        write(RESOLVED_DROPIN, "[Resolve]\nMulticastDNS=yes\n")
+        state["created"] = [RESOLVED_DROPIN]
+        if init.running("NetworkManager"):
+            write(NM_DROPIN, "[connection]\nconnection.mdns=2\n")
+            state["created"].append(NM_DROPIN)
+        apply_resolved_settings(init)
+        interface = default_interface()
+        deadline = time.monotonic() + MDNS_WAIT
+        while True:
+            if interface:
+                run("resolvectl", "mdns", interface, "yes")
+            if resolved_mdns_on():
+                break
+            if time.monotonic() > deadline:
+                return False
+            time.sleep(0.3)  # NetworkManager sets its links up again after the restart
+    if override:
+        step("mdns", True, N_(".local names work ({how}). This overrides MulticastDNS={value} in {path}."),
+             how="systemd-resolved", **override)
+    else:
+        step("mdns", True, N_(".local names work ({how})."), how="systemd-resolved")
+    return True
+
+
 def ensure_mdns(init, state):
     avahi = init.installed("avahi-daemon")
     resolved = init.kind == "systemd" and init.running("systemd-resolved")
@@ -462,25 +532,14 @@ def ensure_mdns(init, state):
         else:
             step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
         return
+    override = None
     if resolved:
-        if not resolved_mdns_on():
-            write(RESOLVED_DROPIN, "[Resolve]\nMulticastDNS=yes\n")
-            state.setdefault("created", []).append(RESOLVED_DROPIN)
-            if init.running("NetworkManager"):
-                write(NM_DROPIN, "[connection]\nconnection.mdns=2\n")
-                state["created"].append(NM_DROPIN)
-                run("nmcli", "general", "reload", "conf")
-            run("systemctl", "restart", "systemd-resolved.service")
-            interface = default_interface()
-            if interface:
-                run("resolvectl", "mdns", interface, "yes")
-        if resolved_mdns_on():
-            step("mdns", True, N_(".local names work ({how})."), how="systemd-resolved")
-        else:
-            step("mdns", False, N_("Could not turn on mDNS in systemd-resolved. "
-                                   "Install avahi and nss-mdns, then click “Fix”."))
-        return
-    if avahi:
+        if ensure_resolved_mdns(init, state):
+            return
+        override = resolved_mdns_override()
+        remove_mdns_dropins(init, state)
+    masked = avahi and init.masked("avahi-daemon")
+    if avahi and not masked:
         if "avahi" not in state:
             state["avahi"] = {"enabled": init.enabled("avahi-daemon"), "running": False}
         try:
@@ -494,14 +553,23 @@ def ensure_mdns(init, state):
         else:
             step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
         return
-    step("mdns", False, N_("No mDNS service, so other computers cannot find this one by name. "
-                           "Install: sudo pacman -S avahi nss-mdns (on Artix also avahi-{init}), "
-                           "then click “Fix”."), init=init.kind)
+    if override:
+        step("mdns", False, N_("MulticastDNS={value} in {path} keeps mDNS off in systemd-resolved. "
+                               "Remove that line, then click “Fix”."), **override)
+    elif masked:
+        step("mdns", False, N_("Could not turn on mDNS: the avahi-daemon service is masked. Run: sudo systemctl "
+                               "unmask avahi-daemon.service avahi-daemon.socket, then click “Fix”."))
+    elif resolved:
+        step("mdns", False, N_("Could not turn on mDNS in systemd-resolved. "
+                               "Install avahi and nss-mdns, then click “Fix”."))
+    else:
+        step("mdns", False, N_("No mDNS service, so other computers cannot find this one by name. "
+                               "Install: sudo pacman -S avahi nss-mdns (on Artix also avahi-{init}), "
+                               "then click “Fix”."), init=init.kind)
 
 
 def revert_mdns(init, state):
-    for path in state.pop("created", []):
-        remove(path)
+    remove_mdns_dropins(init, state)
     if state.pop("nsswitch", False):
         text = read("/etc/nsswitch.conf")
         write("/etc/nsswitch.conf", text.replace(f" {NSS_MDNS}", "", 1))
@@ -509,8 +577,6 @@ def revert_mdns(init, state):
     if avahi and not avahi["enabled"]:
         init.disable("avahi-daemon")
         init.stop("avahi-daemon")
-    if init.kind == "systemd" and init.running("systemd-resolved"):
-        run("systemctl", "restart", "systemd-resolved.service")
 
 
 # --------------------------------------------------------------- Tailscale

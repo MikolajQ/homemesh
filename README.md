@@ -161,7 +161,9 @@ through polkit, or `sudo` in a terminal. It:
 - starts it at boot, with systemd, OpenRC, runit, s6 or dinit;
 - opens the firewall (ufw or firewalld) for the local network: 22/tcp,
   41753/udp and 41753–41762/tcp; and SSH on the VPN interfaces;
-- turns on mDNS if `name.local` does not work yet.
+- turns on mDNS if `name.local` does not work yet, in systemd-resolved
+  (`/etc/systemd/resolved.conf.d/zz-homemesh-mdns.conf`; being last, it also
+  overrides a `MulticastDNS=no` set there before) or else with Avahi.
 
 *Turn off* puts back what was there before. Setting up Tailscale goes through
 the same helper (see [Away from home](#away-from-home)); turning sharing off
