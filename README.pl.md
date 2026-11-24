@@ -226,9 +226,10 @@ zalogował, są zamiast tego sprawdzane połączeniem SSH co trzy minuty.
 
 ## Stan
 
-Wersja 0.2: młoda. Sprawdzona między dwoma komputerami z systemami opartymi
-na Archu, jednym z GNOME i jednym z KDE Plasma; obsługa Dolphina i systemów bez
-systemd (OpenRC, runit, s6, dinit) jest napisana, ale jeszcze nie sprawdzona na
+Wersja 0.5: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
+z GNOME, KDE Plasma i LXQt. Oznaczanie wyłączonych komputerów sprawdzone z
+pcmanfm-qt; obsługa Dolphina, instalowanie pakietów poza Archem i systemy bez
+systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 żywo. Zgłoszenia mile widziane.
 
 ## Odinstalowanie

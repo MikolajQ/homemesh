@@ -225,10 +225,11 @@ minutes instead.
 
 ## Status
 
-Version 0.2: young. It has been tried between two Arch-based computers, one
-with GNOME and one with KDE Plasma; Dolphin's side and the systems without
-systemd (OpenRC, runit, s6, dinit) are written but not yet tried for real.
-Reports are welcome.
+Version 0.5: young. It has been tried between Arch-based computers with GNOME,
+KDE Plasma and LXQt. Marking the computers that are off has been tried with
+pcmanfm-qt; Dolphin's side, installing packages outside Arch and the systems
+without systemd (OpenRC, runit, s6, dinit) are written but not yet tested for
+real. Reports are welcome.
 
 ## Uninstall
 
