@@ -1,4 +1,6 @@
-"""homemesh watch: marks the computers that are off in the file manager.
+"""homemesh watch: marks the computers that are off in the file manager,
+notices when the local network keeps breaking (see breaks.py) and tells the
+group when this computer gets another VPN address.
 
 A bookmark of a computer that is off makes the file manager wait and then
 fail, so its name says it: "(off) laptop". One small process per desktop
@@ -25,7 +27,7 @@ import time
 from pathlib import Path
 from queue import Empty, SimpleQueue
 
-from . import __version__, paths, presence, render, state, system
+from . import __version__, breaks, paths, presence, render, state, sync, system, wifi
 
 PACE = float(os.environ.get("HOMEMESH_TEST_PACE", "1"))  # tests only
 ASK = 60 * PACE  # a computer whose HomeMesh answers
@@ -34,6 +36,12 @@ LOOK = 300 * PACE  # one that is off
 AGAIN = 8 * PACE  # a second look before believing that a computer is gone
 NETWORK = tuple(PACE * wait for wait in (0, 6, 25))  # after a change: names take a moment
 LEAVING = tuple(PACE * wait for wait in (3, 10, 25))  # after "bye": shutting down takes a moment
+BACK = tuple(PACE * wait for wait in (10, 20, 30, 45, 60, 90, 150))  # is the local network back?
+BREAK = 900 * PACE  # gone for longer, it was no break: the computer has left home
+SOON = 60 * PACE  # the VPN takes over within seconds; a computer that starts again takes longer
+ROAMED = tuple(PACE * wait for wait in (2, 12, 30))  # after the Wi-Fi joined an access point
+PATIENT = 40 * PACE  # so long after that, no answer does not mean that a computer is off
+HOUR = 3600
 SETTLE = 2 * PACE
 NETLINK_IPV4_ADDRESSES = 0x10  # RTMGRP_IPV4_IFADDR
 
@@ -45,6 +53,10 @@ class Seen:
         self.on = None  # not known yet
         self.reach = system.NOWHERE
         self.hint = None
+        self.local = None  # the local address it answered at last
+        self.lost = None  # since when it has not
+        self.away = None  # since when it has answered only through the VPN instead
+        self.patient = now
         self.misses = 0
         self.due = now
         self.soon = ()
@@ -57,18 +69,42 @@ class Seen:
         self.soon = tuple(now + wait for wait in waits)
 
     def checked(self, reach, now):
+        """True when the local network between us has just come back after a break."""
         self.busy = False
         self.soon = tuple(when for when in self.soon if when > now)
         if reach.how:
+            broke = self._broke(reach, now)
             self.on, self.misses, self.reach, self.hint = True, 0, reach, reach.address
             self.due = now + (ASK if reach.answers and reach.how == "lan" else CONNECT)
-            return
+            return broke
         self.misses += 1
-        if self.on is not False and self.misses < 2:
+        if self.lost is None:
+            self.lost = now
+        if self.on is not False and self.misses < 2 or self.on and now < self.patient:
             self.due = now + (AGAIN if self.on else AGAIN / 4)
-            return
-        self.on, self.reach, self.hint = False, system.NOWHERE, None
+            return False
+        self.on, self.reach, self.hint, self.away = False, system.NOWHERE, None, None
         self.due = now + LOOK
+        return False
+
+    def _broke(self, reach, now):
+        if reach.how == "vpn":
+            if self.lost is None:
+                self.lost = now
+            # An answer, not just an open port: only who knows our VPN address
+            # answers there, and so accepts our key from there as well.
+            if reach.answers and self.local and self.away is None and now - self.lost < SOON:
+                self.away = now
+                self.hurry(now, BACK)
+            return False
+        broke = self.away is not None and reach.address == self.local and now - self.away < BREAK
+        self.local, self.lost, self.away = reach.address, None, None
+        return broke
+
+    def forget(self):
+        """It is leaving, or this computer is in another network, perhaps:
+        what was found locally says nothing now."""
+        self.local = self.lost = self.away = None
 
     def heard(self, address, now):
         """It asked us, so it is on, and asking it back can wait."""
@@ -81,8 +117,13 @@ class Seen:
 
 
 class Watcher:
-    def __init__(self, check=system.reach):
+    def __init__(self, check=system.reach, sync_all=sync.sync_all):
         self.check = check
+        self.sync_all = sync_all
+        self.told = None  # the `updated` of our card as the group knows it
+        self.telling = threading.Lock()
+        self.breaking = None  # who is reached through the VPN because the local network breaks
+        self.roamed = []  # when the Wi-Fi joined an access point in the last hour
         self.st = None
         self.stamp = None
         self.seen = {}
@@ -145,6 +186,32 @@ class Watcher:
             self.settle = time.monotonic() + SETTLE
         self.selector.register(sock, selectors.EVENT_READ, data)
 
+    def watch_wifi(self):
+        sock = wifi.events()
+        if sock is None:
+            return
+
+        def data(sock):
+            joined = False
+            try:
+                while True:
+                    joined |= wifi.joined(sock.recv(65536))
+            except OSError:  # nothing more, or too much at once
+                pass
+            if joined:
+                self.roam(time.monotonic())
+        self.selector.register(sock, selectors.EVENT_READ, data)
+
+    def roam(self, now):
+        """The Wi-Fi has moved to another access point, or joined its first one."""
+        if self.roamed and now - self.roamed[-1] < 2:  # several events tell of the same
+            return
+        self.roamed = [when for when in self.roamed if now - when < HOUR] + [now]
+        for seen in self.seen.values():
+            if seen.on:
+                seen.patient = now + PATIENT
+                seen.hurry(now, ROAMED)
+
     @staticmethod
     def _asleep():
         """Seconds this computer has slept since it started."""
@@ -152,8 +219,10 @@ class Watcher:
 
     def listen(self):
         """Answer at each of this computer's own addresses. Not at all of them
-        with one socket: with the window open, packets would go to the window."""
+        with one socket: with the window open, packets would go to the window.
+        True when the addresses have changed."""
         wanted = presence.own_addresses()
+        changed = wanted != set(self.sockets)
         for address in set(self.sockets) - wanted:
             sock = self.sockets.pop(address)
             self.selector.unregister(sock)
@@ -169,6 +238,7 @@ class Watcher:
             sock.setblocking(False)
             self.sockets[address] = sock
             self.selector.register(sock, selectors.EVENT_READ, self._packet)
+        return changed
 
     def _packet(self, sock):
         try:
@@ -182,11 +252,13 @@ class Watcher:
         now = time.monotonic()
         if note["t"] == "ping":
             try:
-                sock.sendto(presence.pong(note, system.ssh_listening()), where)
+                sock.sendto(presence.pong(note, system.ssh_listening(), breaks.ages(self.st["peers"][pid])), where)
             except OSError:
                 pass
             self.seen[pid].heard(where[0], now)
+            self.learn(pid, breaks.sound(note.get("breaks")))
         elif note["t"] == "bye":
+            self.seen[pid].forget()
             self.seen[pid].hurry(now, LEAVING)
 
     # ------------------------------------------------------------- checks
@@ -202,11 +274,13 @@ class Watcher:
             self.stamp = stamp
             before = self.st["peers"] if self.st else {}
             self.st = state.load()
+            if self.told is None:  # it was told at login or is being told right now
+                self.told = self.st["self"]["updated"]
             now = time.monotonic()
             for pid, peer in self.st["peers"].items():
                 if pid not in self.seen:
                     self.seen[pid] = Seen(now)
-                elif before.get(pid) != peer:
+                elif state.card_of(before.get(pid, {})) != state.card_of(peer):
                     self.seen[pid].hurry(now, (0,))
             for pid in set(self.seen) - set(self.st["peers"]):
                 del self.seen[pid]
@@ -234,7 +308,8 @@ class Watcher:
             while True:
                 pid, reach = self.results.get_nowait()
                 if pid in self.seen:
-                    self.seen[pid].checked(reach, time.monotonic())
+                    broke = self.seen[pid].checked(reach, time.monotonic())
+                    self.learn(pid, reach.breaks + ((0,) if broke else ()))
         except Empty:
             pass
 
@@ -242,12 +317,57 @@ class Watcher:
         for seen in self.seen.values():
             seen.hurry(time.monotonic(), waits)
 
+    def learn(self, pid, ages):
+        """Remember breaks of the local network: ours, or those the other one knows of."""
+        if not ages or breaks.merged(self.st["peers"].get(pid, {}), ages) is None:
+            return
+        now = time.monotonic()
+        with state.transaction() as st:
+            peer = st["peers"].get(pid)
+            times = breaks.merged(peer, ages) if peer else None
+            if times is not None:
+                peer["breaks"] = times
+                st["roamed"] = sum(now - when < HOUR for when in self.roamed)
+        self.refresh()
+
+    def route(self):
+        """Have SSH try the VPN first where the local network keeps breaking, and no longer than that."""
+        breaking = {pid for pid, peer in self.st["peers"].items() if breaks.breaking(peer)}
+        if breaking == self.breaking or not paths.state_file().exists():
+            return
+        self.breaking = breaking
+        with state.transaction() as st:
+            render.apply(st)
+
     def mark(self, marks):
         if marks == self.marked or not paths.state_file().exists():
             return
         with state.transaction() as st:
             render.bookmarks(st, marks)
         self.marked = marks
+
+    # ---------------------------------------------------------- our card
+
+    def tell(self):
+        """Tell the group if our card has changed: the VPN has just connected for
+        the first time, or with another address."""
+        threading.Thread(target=self._tell, daemon=True).start()
+
+    def _tell(self):
+        with self.telling:
+            if not paths.state_file().exists():
+                return
+            with state.transaction() as st:
+                updated = state.own_card(st)["updated"]
+            if updated == self.told:
+                return
+            self.told = updated
+            left = None  # everyone
+            for wait in NETWORK:
+                time.sleep(wait)
+                left = {pid for pid, error in self.sync_all(only=left).items() if error is not None}
+                if not left:
+                    break
 
     # --------------------------------------------------------------- loop
 
@@ -259,8 +379,11 @@ class Watcher:
             self.settle = now + SETTLE
         if self.settle is not None and self.settle <= now:
             self.settle = None
-            self.listen()
+            if self.listen():
+                for seen in self.seen.values():
+                    seen.forget()
             self.hurry(NETWORK)
+            self.tell()
         self.start_checks(now)
         times = [seen.next() for seen in self.seen.values() if not seen.busy]
         if self.settle is not None:
@@ -271,6 +394,7 @@ class Watcher:
         for key, _events in self.selector.select(timeout):
             key.data(key.fileobj)
         self.collect()
+        self.route()
         self.mark({pid: not seen.on for pid, seen in self.seen.items() if seen.on is not None})
 
     def run(self):
@@ -278,6 +402,7 @@ class Watcher:
             signal.signal(number, self.stop)
         signal.set_wakeup_fd(self.wake_out.fileno(), warn_on_full_buffer=False)
         self.watch_network()
+        self.watch_wifi()
         if self.refresh():
             self.listen()
         while not self.stopping and self.refresh():

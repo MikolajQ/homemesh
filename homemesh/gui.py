@@ -18,8 +18,8 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import (APP_ID, APP_NAME, __version__, paths, proto, render, share, state, sync, system,  # noqa: E402
-               tailscale, vpn, watch)
+from . import (APP_ID, APP_NAME, __version__, breaks, paths, proto, render, share, state, sync,  # noqa: E402
+               system, tailscale, vpn, watch)
 from .discovery import Discovery  # noqa: E402
 from .i18n import _  # noqa: E402
 from .pairing import Session  # noqa: E402
@@ -52,6 +52,7 @@ list.boxed > row:not(:last-child) { border-bottom: 1px solid alpha(currentColor,
 
 # A check mark: Adwaita no longer has emblem-ok-symbolic.
 OK_ICON = "object-select-symbolic"
+MANY_ROAMS = 10  # access points in an hour: more than moving around with a laptop
 
 
 def label(text="", *classes, wrap=False, ellipsize=False, xalign=0.0, chars=56):
@@ -406,6 +407,37 @@ class AwayDialog(Dialog):
         self.add_button(_("Try again"), self.start, "suggested-action")
 
 
+class BreaksDialog(Dialog):
+    """The local network keeps breaking: what HomeMesh does about it, and what helps."""
+
+    def __init__(self, parent, peers, roamed):
+        super().__init__(parent, _("Local network"), 520)
+        count = max(len(breaks.times(peer)) for peer in peers)
+        self.content(
+            label(_("The local network keeps breaking"), "big"),
+            label(_("In the last three days it broke {n} times between this computer and {names}: both were on "
+                    "and answered through {vpn}, but not directly. HomeMesh now connects them through {vpn} "
+                    "first. At home that is about as fast, and open folders survive the breaks. After three days "
+                    "without a break it goes back to the local network.")
+                  .format(n=count, names=", ".join(sorted(peer["name"] for peer in peers)),
+                          vpn=peers[0]["vpn"][0]["kind"]), wrap=True))
+        if roamed >= MANY_ROAMS:
+            self.content(label(_("The Wi-Fi of this computer changed access points {n} times in an hour. It is where "
+                                 "several of them are about equally strong, such as the bands of one router.")
+                               .format(n=roamed), wrap=True))
+        self.content(label(_("What usually helps"), "heading"))
+        for text in (_("Update the software (firmware) of the router and of the mesh nodes, then restart them."),
+                     _("If the bands of the router (2.4 and 5 GHz) share one name, give each its own and use one of "
+                       "them on the computers. They then stop jumping between the bands and still move between mesh "
+                       "nodes."),
+                     _("Connect a computer that stays in one place with a cable.")):
+            self.content(label("• " + text, wrap=True))
+        self.add_button(_("More…"), lambda: Gtk.UriLauncher.new(
+            # Translators: a page in your language if there is one, such as local-network.pl.md
+            _("https://github.com/MikolajQ/homemesh/blob/main/docs/local-network.md")).launch(self, None, None, None))
+        self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
+
+
 class ShareDialog(Dialog):
     """The whole home folder, or chosen folders, each read-only or not."""
 
@@ -661,6 +693,8 @@ class PeerRow(Gtk.ListBoxRow):
         self.dot.add_css_class("dot-on" if how in ("lan", "vpn", True) else "dot-off")
         if how == "checking":
             status = _("checking…")
+        elif how and breaks.breaking(self.peer):
+            status = _("through VPN, as the local network keeps breaking")
         elif how in ("lan", True):
             status = _("reachable on the local network")
         elif how == "vpn":
@@ -971,12 +1005,26 @@ class MainWindow(Gtk.ApplicationWindow):
         elif any(e["ready"] for e in waiting):
             hint("step", "list-add-symbolic", _("Another computer is nearby"),
                  _("Click “Connect” to add {name} to the group.").format(name=waiting[0]["name"]))
+        elif self.breaking():
+            broken = self.breaking()
+            hint("step", "network-wireless-symbolic", _("The local network keeps breaking"),
+                 _("So connections to {names} go through {vpn} first, which survives it.")
+                 .format(names=", ".join(peer["name"] for peer in broken), vpn=broken[0]["vpn"][0]["kind"]),
+                 _("What helps…"), self.show_breaks)
         else:
             hint("done", OK_ICON, _("All set"),
                  _("Paired computers are in your file manager's sidebar. A new computer only needs "
                    "pairing with one of them: the others learn about it by themselves.")
                  + (" " + _("Computers that are off are marked “(off)” there.")
                     if self.st.get("login", True) else ""))
+
+    def breaking(self):
+        """The computers to which the local network keeps breaking."""
+        return sorted(filter(breaks.breaking, self.st["peers"].values()), key=lambda peer: peer["name"])
+
+    def show_breaks(self):
+        if self.breaking():
+            BreaksDialog(self, self.breaking(), self.st.get("roamed", 0)).present()
 
     # ------------------------------------------------------------- checks
 
@@ -1297,10 +1345,15 @@ class MainWindow(Gtk.ApplicationWindow):
             self.online[pid] = "lan" if online else None
         self.st = state.new_state()
         self.st["peers"] = peers
+        if self.demo == "breaks":
+            for peer in peers.values():
+                peer["vpn"] = [{"addr": "100.101.102.104", "kind": "Tailscale"}]
+            peers["1" * 32]["breaks"] = [now - 3600 * hours for hours in (9, 8, 7, 5, 2)]
+            self.st["roamed"] = 34
         self.configured = self.running = True
         self.tunnels = [{"addr": "100.101.102.103", "kind": "Tailscale"}]
         self.nearby = [{"id": "9" * 32, "name": old, "user": user, "port": 41753,
-                        "ready": True, "ip": "192.168.1.23", "seen": 0}]
+                        "ready": self.demo != "breaks", "ip": "192.168.1.23", "seen": 0}]
         self.rebuild_peers()
         self.nearby_list.remove_all()
         for entry in self.nearby:
@@ -1368,6 +1421,11 @@ class App(Gtk.Application):
 
     def _shoot(self, path):
         target = self.window.content
+        if self.options.get("breaks-help"):
+            dialog = BreaksDialog(self.window, self.window.breaking(), self.window.st["roamed"])
+            dialog.present()
+            GLib.timeout_add(800, lambda: (save_screenshot(dialog.get_child(), path), self.quit(), False)[2])
+            return False
         if self.options.get("vpn-help"):
             dialog = AwayDialog(self.window, [])
             dialog.present()
@@ -1402,7 +1460,9 @@ class App(Gtk.Application):
 
 def run(argv):
     options = {"demo": "--demo" in argv, "dark": "--dark" in argv, "pair": "--pair" in argv,
-               "share": "--share" in argv, "vpn-help": "--vpn-help" in argv}
+               "share": "--share" in argv, "vpn-help": "--vpn-help" in argv, "breaks-help": "--breaks-help" in argv}
+    if "--breaks" in argv or options["breaks-help"]:
+        options["demo"] = options["demo"] and "breaks"
     if "--screenshot" in argv:
         options["screenshot"] = argv[argv.index("--screenshot") + 1]
     return App(options).run([sys.argv[0]])

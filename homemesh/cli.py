@@ -7,8 +7,8 @@ import sys
 import threading
 import time
 
-from . import (APP_NAME, PORT, __version__, paths, proto, render, share, state, sync, system, tailscale,
-               vpn, watch)
+from . import (APP_NAME, PORT, __version__, breaks, paths, proto, render, share, state, sync, system,
+               tailscale, vpn, watch)
 from .discovery import Discovery
 from .i18n import _
 from .pairing import Session
@@ -65,7 +65,7 @@ def cmd_status(args):
     print(_(".local names: working ({how})").format(how=how) if works
           else _(".local names: not working. Fix: homemesh enable"))
     print(_("Shared: {what}").format(what=share.summary(share.current(st))))
-    tunnels = card.get("vpn")
+    tunnels = vpn.addresses()  # the card also has those that are down at the moment
     print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
           else _("Away from home: not reachable. Set up Tailscale: homemesh away"))
     print(_("At login: syncs the group, connects the chosen computers and marks the ones that are off")
@@ -79,6 +79,8 @@ def cmd_status(args):
     names = render.aliases(st)
     for pid, peer in sorted(peers.items(), key=lambda kv: kv[1]["name"]):
         status = {"lan": _("on the local network"), "vpn": _("through VPN")}.get(online[pid].how, _("not reachable"))
+        if online[pid].how and breaks.breaking(peer):
+            status = _("through VPN, as the local network keeps breaking")
         print(f"  {peer['name']:<16} {peer['user']}@{names[pid]:<24} {status:<12} {via_text(st, peer)}")
     return 0
 

@@ -68,6 +68,9 @@ sandbox. Whatever is missing is installed with one button.
   login, no commands, with or without systemd) and also works with NetBird,
   ZeroTier, Yggdrasil, Nebula or WireGuard; each connection uses the local
   network when it can and the VPN otherwise.
+- **Copes with a shaky network**: where the local network keeps losing the way
+  between two computers, connections go through the VPN first and survive it;
+  the window says what helps.
 - **Nothing to type**: when a package is missing, one button installs it with
   the distribution's own package manager (pacman, apt, dnf, zypper, xbps or
   apk), and “Fix” repairs what stops other computers from finding this one.
@@ -92,11 +95,13 @@ cards (keys, home folder, VPN addresses) over `ssh … homemesh sync-serve`,
 with newest-wins merging and dated tombstones. Away from home, a
 `Match originalhost … !exec` block falls back to the VPN address when a
 quick local check fails (about 40 ms at home; away it gives up after about
-a second). Presence is a unicast UDP ping a minute between paired computers,
+a second). Where the local network broke twice in three days (the peer
+answers only through the VPN, then locally again), the VPN is tried first.
+Presence is a unicast UDP ping a minute between paired computers,
 answered to them only; a session process keeps the “(off)” marks in the GTK
 bookmarks and KDE's places and ends with the Wayland or X11 display. A root
 helper behind polkit configures sshd (keys only), the firewall and mDNS, and
-installs missing packages. 123 tests, including simulated computers with
+installs missing packages. 158 tests, including simulated computers with
 private sshd instances.
 
 ### Keywords
@@ -164,6 +169,9 @@ do odczytu, podawane z piaskownicy. Czego brakuje, instaluje jeden przycisk.
   logowanie, bez poleceń, z systemd i bez niego), działa też z NetBird,
   ZeroTier, Yggdrasil, Nebula albo WireGuard; każde połączenie idzie przez
   sieć lokalną, gdy się da, a w przeciwnym razie przez VPN.
+- **Radzi sobie z niestabilną siecią**: gdy sieć lokalna gubi drogę między
+  dwoma komputerami, połączenia idą najpierw przez VPN i to przeżywają, a okno
+  podpowiada, co pomaga.
 - **Bez wpisywania poleceń**: brakujący pakiet instaluje jeden przycisk,
   menedżerem pakietów twojej dystrybucji (pacman, apt, dnf, zypper, xbps albo
   apk), a „Napraw” usuwa to, przez co inne komputery nie widzą tego.
@@ -189,11 +197,13 @@ adresy VPN) przez `ssh … homemesh sync-serve`; wygrywa nowsza karta, a
 usunięcia zostawiają datowane ślady. Poza domem blok
 `Match originalhost … !exec` przełącza na adres VPN, gdy szybkie sprawdzenie
 sieci lokalnej się nie powiedzie (w domu około 40 ms; poza domem rezygnuje po
-mniej więcej sekundzie). Obecność to jedno zapytanie UDP na minutę, wprost na
+mniej więcej sekundzie). Gdy sieć lokalna zerwała się dwa razy w ciągu trzech
+dni (komputer odpowiada tylko przez VPN, a potem znowu lokalnie), SSH próbuje
+najpierw VPN-u. Obecność to jedno zapytanie UDP na minutę, wprost na
 adres połączonego komputera; odpowiedź dostają tylko połączone. Proces w sesji
 utrzymuje dopiski „(off)” w zakładkach GTK i miejscach KDE i kończy się razem z
 Waylandem albo X11. Pomocnik z uprawnieniami roota za polkit ustawia sshd
-(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 123 testy, w
+(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 158 testów, w
 tym symulowane komputery z prywatnymi instancjami sshd.
 
 ### Słowa kluczowe

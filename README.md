@@ -26,6 +26,7 @@ Linux computer already has.
 | **Your file manager** | Paired computers appear as bookmarks in GTK file managers (GVfs) and in Dolphin (KIO). A click mounts; optionally they mount at login. A computer that is off is marked: *(off) laptop*. |
 | **Choose what to share** | The whole home folder, or only chosen folders, each read-write or read-only. Chosen folders are served from a sandbox: the rest of your home, your keys and the system are simply not there. |
 | **Away from home** | One click sets up Tailscale: HomeMesh installs it, starts it and opens the login page; no commands. Already have NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? It finds them by itself. Each connection goes over the local network when possible and through the VPN otherwise, with the same bookmarks. |
+| **Copes with a shaky network** | Where the local network keeps losing the way between two computers (a Wi-Fi mesh that is slow to notice that a laptop moved, for example), connections go through the VPN first until it has been quiet for three days: about as fast at home, and open folders stay open. The window says so and [what helps](docs/local-network.md). |
 | **Light** | GTK 4 without libadwaita, so it fits any desktop. No system daemon: sharing is the system's `sshd`; the window is needed only to find and pair computers, and one small process in your session marks the ones that are off. Works with or without systemd. |
 | **Terminal too** | Everything the window does, `homemesh` does in a terminal, so headless machines can join. |
 
@@ -120,11 +121,16 @@ After the administrator password it:
 
 Do the same on every computer, with the same account (`homemesh away` does it
 in a terminal). While the computers are at home they exchange their VPN
-addresses. From then on every connection first checks
+addresses; one whose VPN is off for the moment keeps its address, and another
+address reaches the others by itself. From then on every connection first checks
 the local network (about 40 ms at home; away from home the check gives up
 after about a second) and uses the VPN only when the other computer is not
 there. Away from home, files travel over your home's internet
 uplink, so large files are slower than at home.
+
+The VPN also helps at home where the [local network keeps
+breaking](docs/local-network.md): after the second break in three days SSH
+tries the VPN first.
 
 ## What other computers see
 
@@ -195,9 +201,11 @@ HomeMesh logs in with a key of its own (`~/.config/homemesh/id_ed25519`). It
 never touches your keys or any line it did not write.
 
 **The group**: every computer has a card (name, user, home folder, keys, VPN
-addresses). Whenever members talk (window open, login, pairing), they swap
-what they know through `ssh … homemesh sync-serve`. The newer card wins, and
-removals leave a dated tombstone so they spread too.
+addresses). Whenever members talk (window open, login, pairing, another VPN
+address), they swap what they know through `ssh … homemesh sync-serve`. The
+newer card wins, and removals leave a dated tombstone so they spread too. VPN
+addresses stay on the card while the VPN is down (Tailscale connects a moment
+after login), until it has been down for half a year.
 
 **At login**: a short task (XDG autostart, can be turned off) catches up with
 the group and mounts the computers marked *Connect at login*, then exits.
@@ -211,7 +219,8 @@ is broadcast, and nothing is logged by its `sshd`. One that is off is looked up
 every five minutes, but is noticed at once when it starts, because it asks the
 others. Only paired computers get answers. Computers with HomeMesh older than
 0.5, or with nobody logged in, are checked with an SSH connection every three
-minutes instead.
+minutes instead. The same packets show when the local network between two
+computers [keeps breaking](docs/local-network.md); the two tell each other.
 
 ## Security
 
@@ -225,7 +234,7 @@ minutes instead.
 
 ## Status
 
-Version 0.5: young. It has been tried between Arch-based computers with GNOME,
+Version 0.6: young. It has been tried between Arch-based computers with GNOME,
 KDE Plasma and LXQt. Marking the computers that are off has been tried with
 pcmanfm-qt; Dolphin's side, installing packages outside Arch and the systems
 without systemd (OpenRC, runit, s6, dinit) are written but not yet tested for
@@ -238,7 +247,7 @@ real. Reports are welcome.
 
 ## Development
 
-    make test                            # 123 tests; the integration tests run private sshd instances
+    make test                            # 158 tests; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 

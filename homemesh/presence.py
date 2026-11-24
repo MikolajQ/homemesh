@@ -4,9 +4,12 @@
 question is one small packet to one address: nothing is broadcast, and the
 other computer's sshd does not log a connection that says nothing.
 
-    ping  {from, to, n}         are you there?
-    pong  {from, to, n, ready}  yes; ready: its SSH server is running
-    bye   {from, to}            the session there is ending
+    ping  {from, to, n, breaks}         are you there?
+    pong  {from, to, n, breaks, ready}  yes; ready: its SSH server is running
+    bye   {from, to}                    the session there is ending
+
+`breaks`: how many seconds ago the local network between the two broke, as
+far as the sender knows (see breaks.py). HomeMesh before 0.6 does not send it.
 
 Only paired computers get an answer, so a stranger cannot find out who uses
 HomeMesh. The packets prove nothing and need not: they only decide what a
@@ -57,15 +60,16 @@ def sender(st, note, address):
     return None
 
 
-def pong(note, ready):
-    return message("pong", note["to"], note["from"], n=str(note.get("n"))[:32], ready=bool(ready))
+def pong(note, ready, breaks=()):
+    return message("pong", note["to"], note["from"], n=str(note.get("n"))[:32], ready=bool(ready),
+                   breaks=list(breaks))
 
 
-def ask(me, pid, address, tries=TRIES):
-    """True or False: the computer `pid` answers at `address`, and its SSH server
-    runs or not. None: no answer, which an older HomeMesh would not give either."""
+def ask(me, pid, address, tries=TRIES, breaks=()):
+    """The pong of the computer `pid` from `address`. None: no answer, which
+    HomeMesh before 0.5 would not give either."""
     nonce = os.urandom(8).hex()
-    question = message("ping", me, pid, n=nonce)
+    question = message("ping", me, pid, n=nonce, breaks=list(breaks))
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.connect((address, port()))  # only its packets; an error if nobody listens there
@@ -82,7 +86,7 @@ def ask(me, pid, address, tries=TRIES):
                     except socket.timeout:
                         break
                     if note and note["t"] == "pong" and note["from"] == pid and note.get("n") == nonce:
-                        return note.get("ready") is True
+                        return note
     except OSError:
         pass
     return None

@@ -10,7 +10,7 @@ import re
 import urllib.parse
 import xml.dom.minidom
 
-from . import APP_ID, keys, paths, share
+from . import APP_ID, breaks, keys, paths, share
 from .i18n import _
 from .util import LAN_NETS, read_text, write_if_changed, write_text
 
@@ -47,9 +47,12 @@ def ssh_config_text(st, names):
             # Away from home: when the computer does not answer on the local
             # network, use its VPN address. This block comes first because
             # SSH keeps the first value it finds for each option.
+            through, test = tunnels[0]["addr"], f'!exec "{paths.route_command()} {local} {peer["port"]}"'
+            if breaks.breaking(peer):  # the other way round: the VPN if it works
+                test = f'exec "{paths.route_command()} --any {through} {peer["port"]}"'
             lines += [
-                f'Match originalhost {names[pid]} !exec "{paths.route_command()} {local} {peer["port"]}"',
-                f"    HostName {tunnels[0]['addr']}",
+                f"Match originalhost {names[pid]} {test}",
+                f"    HostName {through}",
                 "    AddressFamily any",
                 "",
             ]

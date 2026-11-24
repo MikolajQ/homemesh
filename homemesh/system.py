@@ -12,7 +12,7 @@ import threading
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 
-from . import paths, presence
+from . import breaks, paths, presence
 from .i18n import _
 from .util import is_lan, ssh_port
 
@@ -122,8 +122,9 @@ def _resolve(host, port, timeout=1.5):
 
 
 # How a paired computer can be reached: how ("lan", "vpn" or None), at which
-# address, and whether HomeMesh there answers questions (see presence.py).
-Reach = namedtuple("Reach", "how address answers")
+# address, whether HomeMesh there answers questions (see presence.py), and
+# which breaks of the local network it knows of (see breaks.py).
+Reach = namedtuple("Reach", "how address answers breaks", defaults=((),))
 NOWHERE = Reach(None, None, False)
 
 
@@ -134,8 +135,9 @@ def reach(peer, me=None, hint=None):
     port, tunnels = peer["port"], [item["addr"] for item in peer.get("vpn") or []]
 
     def ask(address, how, tries=presence.TRIES):
-        ready = presence.ask(me, peer["id"], address, tries) if me and ":" not in address else None
-        return None if ready is None else Reach(how if ready else None, address, True)
+        pong = presence.ask(me, peer["id"], address, tries, breaks.ages(peer)) if me and ":" not in address else None
+        return None if pong is None else Reach(how if pong.get("ready") is True else None, address, True,
+                                               breaks.sound(pong.get("breaks")))
 
     answer = ask(hint, "lan") if hint and is_lan(hint) and hint not in tunnels else None
     if answer:

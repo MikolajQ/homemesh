@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from support import HomeTestCase, card
@@ -16,6 +17,21 @@ class CardTest(HomeTestCase):
         with state.transaction() as st:
             third = state.own_card(st, bump=True)
         self.assertGreater(third["updated"], second["updated"])
+
+    def test_a_vpn_that_is_down_stays_on_the_card(self):
+        def own_card(address):
+            os.environ["HOMEMESH_TEST_VPN"] = address
+            with state.transaction() as st:
+                return state.own_card(st)
+        self.assertNotIn("vpn", own_card(""))
+        self.assertNotIn("vpn", state.load()["self"])
+        up = own_card("127.0.0.1")
+        self.assertEqual(state.validate_card(up)["vpn"], [{"addr": "127.0.0.1", "kind": "VPN"}])
+        self.assertEqual(own_card(""), up)  # not even a newer `updated`
+        self.assertEqual(own_card("127.0.0.1"), up)
+        other = own_card("127.0.0.2")
+        self.assertEqual([item["addr"] for item in other["vpn"]], ["127.0.0.2"])
+        self.assertGreater(other["updated"], up["updated"])
 
     def test_state_survives_reload(self):
         with state.transaction() as st:

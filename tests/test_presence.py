@@ -81,7 +81,7 @@ class AskTest(HomeTestCase):
     def test_answers(self):
         for ready in (True, False):
             self.answering(lambda note, r=ready: presence.pong(note, r))
-            self.assertIs(self.ask(), ready)
+            self.assertIs(self.ask()["ready"], ready)
 
     def test_an_answer_to_another_question_does_not_count(self):
         self.answering(lambda note: presence.pong({**note, "n": "stale"}, True))
@@ -105,6 +105,14 @@ class AskTest(HomeTestCase):
         self.assertEqual(system.reach(peer), system.NOWHERE)
         away = {**peer, "address": "127.0.0.9", "vpn": [{"addr": "127.0.0.1", "kind": "VPN"}]}
         self.assertEqual(system.reach(away, "a" * 32, "127.0.0.1").how, "vpn")  # although the address is private
+        asked = []
+        self.answering(lambda note: asked.append(note) or presence.pong(note, True, (3, 70)))
+        peer["breaks"] = [time.time() - 5000]
+        self.assertEqual(system.reach(peer, "a" * 32).breaks, (3, 70))
+        self.assertEqual([round(age, -2) for age in asked[0]["breaks"]], [5000])
+        self.answering(lambda note: presence.message(  # HomeMesh 0.5
+            "pong", note["to"], note["from"], n=note["n"], ready=True))
+        self.assertEqual(system.reach(peer, "a" * 32), system.Reach("lan", "127.0.0.1", True, ()))
         self.answering(lambda note: presence.pong(note, False))  # on, but not sharing
         self.assertEqual(system.reach(peer, "a" * 32).how, None)
 

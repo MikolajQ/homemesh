@@ -47,6 +47,7 @@ class SeenTest(unittest.TestCase):
 
     def test_ssh_connections_and_vpns_are_checked_less_often(self):
         for reach in (LAN._replace(answers=False), LAN._replace(how="vpn")):
+            self.seen = watch.Seen(1000)
             self.seen.checked(reach, 1000)
             self.assertEqual(self.seen.next(), 1000 + watch.CONNECT)
 
@@ -71,7 +72,9 @@ class SeenTest(unittest.TestCase):
         self.assertEqual(looks, [1010 + wait for wait in watch.LEAVING])
 
 
-class WatcherTest(HomeTestCase):
+class WatcherCase(HomeTestCase):
+    """A watcher in a throwaway home, with made-up answers of the two computers it watches."""
+
     def setUp(self):
         super().setUp()
         os.environ["HOMEMESH_ADVERTISE_ADDRESS"] = "127.0.0.1"
@@ -82,8 +85,20 @@ class WatcherTest(HomeTestCase):
             state.merge(st, [card("b", "beta", 10), card("c", "gamma", 11)], {}, via="direct")
             render.apply(st)
         self.reach = {"beta": LAN, "gamma": system.NOWHERE}
-        self.watcher = watch.Watcher(check=lambda peer, me, hint: self.reach[peer["name"]])
+        self.synced, self.sync_errors = [], []
+        self.watcher = watch.Watcher(check=lambda peer, me, hint: self.reach[peer["name"]], sync_all=self.sync_all)
+        self.addCleanup(self.close)
         self.assertTrue(self.watcher.refresh())
+
+    def close(self):
+        for sock in (self.watcher.wake_in, self.watcher.wake_out, *self.watcher.sockets.values()):
+            sock.close()
+        self.watcher.selector.close()
+
+    def sync_all(self, only=None):
+        self.synced.append(only)
+        errors = self.sync_errors.pop(0) if self.sync_errors else {}
+        return {pid: errors.get(pid) for pid in (only or ("b" * 32, "c" * 32))}
 
     def labels(self):
         return [line.split(" ", 1)[1] for line in paths.gtk_bookmarks().read_text().splitlines()]
@@ -96,6 +111,8 @@ class WatcherTest(HomeTestCase):
             self.watcher.step(0.05)
         self.assertTrue(done(), self.labels())
 
+
+class WatcherTest(WatcherCase):
     def test_marks_follow_the_computers(self):
         self.settle(lambda: self.labels() == ["beta", "(off) gamma"])
         self.reach = {"beta": system.NOWHERE, "gamma": LAN}
@@ -142,7 +159,7 @@ class WatcherTest(HomeTestCase):
             while thread.is_alive():
                 self.settle(lambda: True)
                 self.watcher.step(0.05)
-        self.assertIn(answers[0], (True, False))
+        self.assertIn(answers[0]["ready"], (True, False))
         self.assertIsNone(answers[1])  # a stranger
 
     def test_one_watcher_and_a_new_build_replaces_the_old_one(self):
@@ -177,6 +194,50 @@ class WatcherTest(HomeTestCase):
         finally:
             first.kill()
             first.wait()
+
+    def own_card(self, address):
+        os.environ["HOMEMESH_TEST_VPN"] = address
+        with state.transaction() as st:
+            state.own_card(st)
+
+    def test_the_group_is_told_about_another_vpn_address(self):
+        self.own_card("127.0.0.1")
+        self.watcher.told = None
+        self.watcher.stamp = None
+        self.watcher.refresh()
+        waits, sleep = [], time.sleep
+        self.addCleanup(setattr, watch.time, "sleep", sleep)
+        watch.time.sleep = waits.append
+        for address in ("127.0.0.1", ""):  # nothing new, and down for a moment
+            os.environ["HOMEMESH_TEST_VPN"] = address
+            self.watcher._tell()
+        self.assertEqual(self.synced, [])
+        os.environ["HOMEMESH_TEST_VPN"] = "127.0.0.2"
+        self.sync_errors = [{"c" * 32: "timeout"}, {"c" * 32: "timeout"}]
+        self.watcher._tell()
+        self.assertEqual(self.synced, [None, {"c" * 32}, {"c" * 32}])  # again, but only the one missed
+        self.assertEqual(waits, list(watch.NETWORK))
+        self.watcher._tell()
+        self.assertEqual(len(self.synced), 3)
+
+    def test_the_group_is_told_even_if_another_process_saw_the_change_first(self):
+        self.own_card("127.0.0.1")
+        self.own_card("127.0.0.2")  # such as "homemesh sync-serve" for one of the others
+        self.own_card("127.0.0.1")
+        self.watcher._tell()
+        self.assertEqual(self.synced, [None])
+
+    def test_a_change_of_the_network_has_the_card_checked(self):
+        self.own_card("127.0.0.1")
+        self.watcher.settle = time.monotonic()
+        self.watcher.step(0)
+        self.settle(lambda: self.synced == [None])
+
+    def test_nothing_is_told_after_reset(self):
+        paths.state_file().unlink()
+        self.watcher._tell()
+        self.assertEqual(self.synced, [])
+        self.assertFalse(paths.state_file().exists())
 
     def test_a_crashing_check_does_not_stop_the_rest(self):
         def check(peer, me, hint):

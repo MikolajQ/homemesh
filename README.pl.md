@@ -26,6 +26,7 @@ SSH/SFTP, które ma każdy Linux.
 | **Twój menedżer plików** | Połączone komputery są zakładkami w menedżerach GTK (GVfs) i w Dolphinie (KIO). Kliknięcie montuje; opcjonalnie montują się po zalogowaniu. Wyłączony komputer ma dopisek: *(off) laptop*. |
 | **Wybierasz, co udostępniasz** | Cały katalog domowy albo tylko wybrane foldery, każdy do odczytu i zapisu albo tylko do odczytu. Wybrane foldery idą z piaskownicy: reszty katalogu domowego, kluczy i systemu po prostu tam nie ma. |
 | **Poza domem** | Jedno kliknięcie ustawia Tailscale: HomeMesh go instaluje, uruchamia i otwiera stronę logowania, bez żadnych poleceń. Masz już NetBird, ZeroTier, Yggdrasil, Nebula albo WireGuard? Wykryje je sam. Połączenie idzie przez sieć lokalną, gdy się da, a w przeciwnym razie przez VPN; zakładki zostają te same. |
+| **Radzi sobie z niestabilną siecią** | Gdy sieć lokalna gubi drogę między dwoma komputerami (na przykład mesh Wi-Fi, który z opóźnieniem zauważa, że laptop się przeniósł), połączenia idą najpierw przez VPN, dopóki nie będzie spokoju przez trzy dni: w domu mniej więcej tak samo szybko, a otwarte foldery zostają otwarte. Okno o tym mówi i podpowiada, [co pomaga](docs/local-network.pl.md). |
 | **Lekki** | GTK 4 bez libadwaita, więc pasuje do każdego pulpitu. Bez demona w systemie: pliki podaje systemowy `sshd`, okno jest potrzebne tylko do znajdowania i łączenia komputerów, a jeden mały proces w twojej sesji oznacza wyłączone. Działa z systemd i bez niego. |
 | **Także w terminalu** | Wszystko, co robi okno, zrobi też polecenie `homemesh`, więc dołączą również komputery bez ekranu. |
 
@@ -117,11 +118,16 @@ Po podaniu hasła administratora:
 - otwiera stronę logowania w przeglądarce i po zalogowaniu kończy resztę.
 
 Zrób to samo na każdym komputerze, tym samym kontem (w terminalu: `homemesh
-away`). Gdy komputery są w domu, wymieniają się adresami VPN. Od tej chwili każde połączenie najpierw
-sprawdza sieć lokalną (w domu około 40 ms; poza domem sprawdzenie rezygnuje po
-mniej więcej sekundzie), a VPN-u używa tylko wtedy, gdy drugiego komputera w
-niej nie ma. Poza domem pliki płyną przez łącze
+away`). Gdy komputery są w domu, wymieniają się adresami VPN; wyłączony na
+chwilę VPN nie kasuje adresu, a nowy adres sam dociera do pozostałych. Od tej
+chwili każde połączenie najpierw sprawdza sieć lokalną (w domu około 40 ms; poza
+domem sprawdzenie rezygnuje po mniej więcej sekundzie), a VPN-u używa tylko
+wtedy, gdy drugiego komputera w niej nie ma. Poza domem pliki płyną przez łącze
 internetowe domu, więc duże pliki idą wolniej niż w domu.
+
+VPN pomaga także w domu, w którym [sieć lokalna się
+zrywa](docs/local-network.pl.md): po drugim zerwaniu w ciągu trzech dni SSH
+próbuje najpierw VPN-u.
 
 ## Co widzą inne komputery
 
@@ -195,10 +201,11 @@ HomeMesh loguje się własnym kluczem (`~/.config/homemesh/id_ed25519`). Nie
 rusza twoich kluczy ani żadnej linii, której sam nie dopisał.
 
 **Grupa**: każdy komputer ma kartę (nazwa, użytkownik, katalog domowy, klucze,
-adresy VPN). Przy każdym kontakcie (otwarte okno, logowanie, parowanie)
-członkowie wymieniają się tym, co wiedzą, przez `ssh … homemesh sync-serve`.
-Wygrywa nowsza karta, a usunięcie zostawia datowany ślad, więc też się
-rozchodzi.
+adresy VPN). Przy każdym kontakcie (otwarte okno, logowanie, parowanie, nowy
+adres VPN) członkowie wymieniają się tym, co wiedzą, przez `ssh … homemesh
+sync-serve`. Wygrywa nowsza karta, a usunięcie zostawia datowany ślad, więc też
+się rozchodzi. Adresy VPN zostają na karcie, gdy VPN nie działa (Tailscale łączy
+się chwilę po zalogowaniu), dopóki nie milczy przez pół roku.
 
 **Po zalogowaniu**: krótkie zadanie z autostartu (do wyłączenia) uzgadnia grupę
 i montuje komputery oznaczone *Podłączaj po zalogowaniu*, po czym się kończy.
@@ -212,7 +219,9 @@ Włączony komputer jest pytany raz na minutę jednym pakietem UDP pod jego adre
 dzienniku. Wyłączony jest wyszukiwany co pięć minut, ale po włączeniu widać go
 od razu, bo sam pyta pozostałe. Odpowiedź dostają tylko połączone komputery.
 Komputery z HomeMesh starszym niż 0.5 albo takie, na których nikt się nie
-zalogował, są zamiast tego sprawdzane połączeniem SSH co trzy minuty.
+zalogował, są zamiast tego sprawdzane połączeniem SSH co trzy minuty. Te same
+pakiety pokazują, że sieć lokalna między dwoma komputerami [się
+zrywa](docs/local-network.pl.md); komputery mówią o tym sobie nawzajem.
 
 ## Bezpieczeństwo
 
@@ -226,7 +235,7 @@ zalogował, są zamiast tego sprawdzane połączeniem SSH co trzy minuty.
 
 ## Stan
 
-Wersja 0.5: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
+Wersja 0.6: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
 z GNOME, KDE Plasma i LXQt. Oznaczanie wyłączonych komputerów sprawdzone z
 pcmanfm-qt; obsługa Dolphina, instalowanie pakietów poza Archem i systemy bez
 systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
@@ -239,7 +248,7 @@ systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 
 ## Dla programistów
 
-    make test                            # 123 testy; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 158 testów; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 

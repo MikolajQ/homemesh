@@ -11,6 +11,7 @@ import ipaddress
 import json
 import os
 import subprocess
+import time
 
 # Interface name prefixes, as each VPN names its interface by default.
 KINDS = (("tailscale", "Tailscale"), ("wt", "NetBird"), ("zt", "ZeroTier"), ("ygg", "Yggdrasil"),
@@ -23,6 +24,8 @@ ALLOWED = [ipaddress.ip_network(net) for net in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8",
     "200::/7", "fc00::/7", "::1/128")]
 MAX_ADDRESSES = 4
+DAY = 24 * 3600
+KEEP = 180 * DAY  # a VPN that has been down this long is gone for good
 
 
 def kind_of(interface, address):
@@ -54,11 +57,11 @@ def network_links():
         return []
 
 
-def addresses(links=None):
-    """[{"addr", "kind"}] of the VPNs on this computer, IPv4 first."""
+def _up(links=None):
+    """[{"addr", "kind", "interface"}] of the VPNs that are up, IPv4 first."""
     override = os.environ.get("HOMEMESH_TEST_VPN")
     if override is not None:
-        return [{"addr": a, "kind": "VPN"} for a in override.split(",") if a]
+        return [{"addr": a, "kind": "VPN", "interface": "test"} for a in override.split(",") if a]
     found = []
     for link in links if links is not None else network_links():
         interface = link.get("ifname", "")
@@ -68,9 +71,46 @@ def addresses(links=None):
                 continue
             kind = kind_of(interface, address)
             if kind and all(item["addr"] != address for item in found):
-                found.append({"addr": address, "kind": kind})
+                found.append({"addr": address, "kind": kind, "interface": interface})
     found.sort(key=lambda item: ":" in item["addr"])
     return found[:MAX_ADDRESSES]
+
+
+def for_card(items):
+    """The `vpn` field of a card: only what the other computers need."""
+    return [{"addr": item["addr"], "kind": item["kind"]} for item in items]
+
+
+def addresses(links=None):
+    """[{"addr", "kind"}] of the VPNs that are up on this computer, IPv4 first."""
+    return for_card(_up(links))
+
+
+def remember(memory, links=None, now=None):
+    """The VPNs that are up, then those that were before and are down at the
+    moment: [{"addr", "kind", "interface", "seen"}]. `memory`: what this gave last.
+
+    Right after login Tailscale has no address yet, for a second or two. If it
+    went off the card, paired computers would stop accepting this computer's
+    key from there, and opening their folders through the VPN would fail.
+    """
+    now = time.time() if now is None else now
+    before = {}
+    for item in memory:
+        if isinstance(item, dict) and item.get("kind") in NAMES and allowed(str(item.get("addr"))) \
+                and isinstance(item.get("interface"), str) and isinstance(item.get("seen"), (int, float)):
+            before[item["interface"], item["addr"]] = item
+    out = []
+    for item in _up(links):
+        old = before.get((item["interface"], item["addr"]))
+        # To the day is enough, and the state need not be written every time.
+        out.append({**item, "seen": old["seen"] if old and 0 <= now - old["seen"] < DAY else now})
+    interfaces, taken = {item["interface"] for item in out}, {item["addr"] for item in out}
+    for (interface, address), item in before.items():
+        if interface not in interfaces and address not in taken and now - item["seen"] < KEEP:
+            out.append(item)
+            taken.add(address)
+    return out[:MAX_ADDRESSES]
 
 
 def validate(value):

@@ -224,6 +224,14 @@ class AwayTest(unittest.TestCase):
         self.assertNotIn("✗", report.stdout, report.stdout + report.stderr)
         status = self.alfa.run("status")
         self.assertIn("through VPN", status.stdout)
+        # The VPN is down on beta, such as right after it starts. Beta syncs
+        # all the same, and its key must still be accepted from there.
+        self.beta.env["HOMEMESH_TEST_VPN"] = ""
+        report = self.beta.run("sync")
+        self.assertNotIn("✗", report.stdout, report.stdout + report.stderr)
+        self.assertEqual(self.alfa.peers()["beta"]["vpn"], beta["vpn"])
+        self.assertEqual(self.alfa.peers()["beta"]["updated"], beta["updated"])
+        self.assertIn("Away from home: not reachable", self.beta.run("status").stdout)  # which is true now
 
 
 @unittest.skipUnless(os.path.exists(SSHD) and shutil.which("ssh"), "needs OpenSSH")

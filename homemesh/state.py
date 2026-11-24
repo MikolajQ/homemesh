@@ -31,7 +31,8 @@ CARD_FIELDS = ("id", "name", "user", "home", "userkey", "hostkey", "port", "upda
 
 
 def new_state():
-    # "share" and "login" are this computer's own settings; they never leave it.
+    # "share" and "login" are this computer's own settings; they never leave it,
+    # and neither do "via", "added", "automount" and "breaks" of the peers.
     return {"format": FORMAT, "id": uuid.uuid4().hex, "self": {"hash": None, "updated": 0},
             "peers": {}, "removed": {}, "bookmarks": [], "kde": [],
             "share": {"mode": "home", "folders": []}, "login": True}
@@ -83,14 +84,17 @@ def own_card(st, bump=False):
     address = os.environ.get("HOMEMESH_ADVERTISE_ADDRESS")  # tests only
     if address:
         card["address"] = address
-    tunnels = vpn.addresses()
-    if tunnels:
-        card["vpn"] = tunnels  # how to reach us away from home
-    digest = hashlib.sha256(canonical(card)).hexdigest()
     mine = st["self"]
+    tunnels = vpn.remember(mine.get("vpn") or [])
+    if tunnels:
+        card["vpn"] = vpn.for_card(tunnels)  # how to reach us away from home
+        mine["vpn"] = tunnels
+    else:
+        mine.pop("vpn", None)
+    digest = hashlib.sha256(canonical(card)).hexdigest()
     if bump or mine.get("hash") != digest:
-        st["self"] = {"hash": digest, "updated": max(time.time(), mine.get("updated", 0) + 0.001)}
-    card["updated"] = st["self"]["updated"]
+        mine.update(hash=digest, updated=max(time.time(), mine.get("updated", 0) + 0.001))
+    card["updated"] = mine["updated"]
     card["version"] = __version__
     return card
 
@@ -175,6 +179,8 @@ def merge(st, cards, removed, via):
         peer["via"] = current["via"] if current else via
         peer["added"] = current["added"] if current else time.time()
         peer["automount"] = current.get("automount", False) if current else False
+        if current and "breaks" in current:
+            peer["breaks"] = current["breaks"]
         st["peers"][pid] = peer
         changed = True
     return changed

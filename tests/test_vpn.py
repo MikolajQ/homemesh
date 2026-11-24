@@ -44,6 +44,62 @@ class DetectTest(unittest.TestCase):
                 vpn.validate(bad)
 
 
+def link(name, *addresses):
+    return {"ifname": name, "addr_info": [{"local": a, "scope": "global"} for a in addresses]}
+
+
+class RememberTest(unittest.TestCase):
+    """A VPN that is down at the moment stays on the card."""
+
+    def setUp(self):
+        os.environ.pop("HOMEMESH_TEST_VPN", None)
+        self.memory = vpn.remember([], LINKS, now=1000)
+
+    def addresses(self):
+        return [item["addr"] for item in self.memory]
+
+    def test_up_then_down(self):
+        self.assertEqual(vpn.for_card(self.memory), vpn.addresses(LINKS))
+        before = self.memory
+        # At boot the interface is there a moment before its address.
+        self.memory = vpn.remember(self.memory, [link("tailscale0")], now=2000)
+        self.assertEqual(self.memory, before)
+        self.memory = vpn.remember(self.memory, LINKS, now=3000)
+        self.assertEqual(self.memory, before)
+
+    def test_another_address_replaces_the_old_one_of_that_vpn(self):
+        self.memory = vpn.remember(self.memory, [link("tailscale0", "100.64.0.9")], now=2000)
+        self.assertEqual(self.addresses(), ["100.64.0.9", "201:abcd::1"])
+
+    def test_one_that_is_up_goes_first(self):
+        self.memory = vpn.remember(self.memory, [link("wg0", "10.9.0.2")], now=2000)
+        self.assertEqual(self.addresses()[0], "10.9.0.2")  # SSH tries only the first
+        self.assertEqual(len(self.memory), vpn.MAX_ADDRESSES)
+        self.memory = vpn.remember(self.memory, [link("wg0", "10.9.0.2"), link("zt1", "10.8.0.2")], now=2000)
+        self.assertEqual(len(self.memory), vpn.MAX_ADDRESSES)
+        self.assertEqual(vpn.validate(vpn.for_card(self.memory)), vpn.for_card(self.memory))
+
+    def test_forgotten_after_half_a_year(self):
+        self.assertEqual(vpn.remember(self.memory, [], now=1000 + vpn.KEEP - 1), self.memory)
+        self.assertEqual(vpn.remember(self.memory, [], now=1000 + vpn.KEEP), [])
+        self.assertEqual(vpn.remember(self.memory, [], now=10), self.memory)  # a clock not set yet
+
+    def test_seen_changes_once_a_day(self):
+        self.assertEqual(vpn.remember(self.memory, LINKS, now=1000 + vpn.DAY - 1), self.memory)
+        later = vpn.remember(self.memory, LINKS, now=1000 + vpn.DAY)
+        self.assertEqual({item["seen"] for item in later}, {1000 + vpn.DAY})
+
+    def test_the_same_address_on_another_interface(self):
+        self.memory = vpn.remember(self.memory, [link("tun5", "201:abcd::1")], now=2000)
+        self.assertEqual(self.addresses().count("201:abcd::1"), 1)
+
+    def test_odd_memory_is_ignored(self):
+        good = self.memory[0]
+        odd = [None, "x", {}, {**good, "addr": "8.8.8.8"}, {**good, "kind": "Evil"}, {**good, "seen": None},
+               {**good, "interface": 3}]
+        self.assertEqual(vpn.remember(odd + [good], [], now=1000), [good])
+
+
 class RenderTest(HomeTestCase):
     def test_fallback_block_and_key_sources(self):
         peer = dict(card("b", "beta", 10), vpn=[{"addr": "100.101.102.103", "kind": "Tailscale"}])
