@@ -80,7 +80,10 @@ From a checkout:
 Needs `openssh`, `python-gobject`, `gtk4` and `polkit`. Optional: `gvfs` for
 GTK file managers, `kio-extras` for Dolphin, `bubblewrap` for sharing only
 chosen folders, `avahi` and `nss-mdns` for `name.local` addresses on systems
-without systemd-resolved.
+without systemd-resolved. When something is missing, HomeMesh shows *Install
+missing packages* and installs it with your distribution's package manager
+(pacman, apt, dnf, zypper, xbps or apk); in a terminal it asks first, or
+`homemesh enable --install`.
 
 ## Quick start
 

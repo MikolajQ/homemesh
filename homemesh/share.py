@@ -47,8 +47,10 @@ def sftp_server():
     return None
 
 
-def sandbox_available():
-    return shutil.which("bwrap") is not None and sftp_server() is not None
+def sandbox_missing():
+    """What sharing chosen folders needs and is not there, as the root helper calls it."""
+    return [thing for thing, there in (("bubblewrap", shutil.which("bwrap")), ("sshd", sftp_server()))
+            if not there]
 
 
 def mount_points(folders, home):

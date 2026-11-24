@@ -1,9 +1,13 @@
 #!/usr/bin/python3 -I
 """homemesh-helper: the few things HomeMesh needs root for.
 
-    homemesh-helper enable           sshd with key logins only, started at boot;
-                                     firewall open for the local network; mDNS
+    homemesh-helper enable [--install]
+                                     sshd with key logins only, started at boot;
+                                     firewall open for the local network; mDNS.
+                                     --install: installs the packages that are
+                                     missing for that
     homemesh-helper disable          undo all of that (once no user needs it)
+    homemesh-helper install THING... any of sshd, avahi, nss-mdns, gvfs, bubblewrap
     homemesh-helper set-hostname N   rename this computer
     homemesh-helper tailscale        Tailscale installed, started at boot and
                                      controllable by the calling user
@@ -15,7 +19,8 @@ zypper, xbps or apk, or else Tailscale's own static build.
 
 Testing: as a normal user, HOMEMESH_HELPER_ROOT=/some/dir makes every path
 relative to that directory, HOMEMESH_HELPER_INIT picks the init system,
-HOMEMESH_HELPER_PM the package manager ("none" by default) and
+HOMEMESH_HELPER_PM the package manager ("none" by default; "detect" finds it
+in the directory's os-release) and
 HOMEMESH_HELPER_TAILSCALE_URL where Tailscale's static builds come from.
 All are ignored when running as root.
 """
@@ -63,6 +68,7 @@ KbdInteractiveAuthentication no
 """
 
 failures = []
+may_install = False  # enable --install: the person agreed to new packages
 
 
 def P(path):
@@ -75,12 +81,15 @@ def N_(text):
     return text
 
 
-def step(name, ok, text, /, **args):
+def step(name, ok, text, /, missing=(), **args):
     """One line of JSON per step: the English text, plus the template and its
-    values so that the caller can show it in the person's language."""
-    print(json.dumps({"step": name, "ok": bool(ok), "msg": text.format(**args), "text": text,
-                      "args": {key: str(value) for key, value in args.items()}},
-                     ensure_ascii=False), flush=True)
+    values so that the caller can show it in the person's language. `missing`:
+    what "enable --install" would install to make it work."""
+    line = {"step": name, "ok": bool(ok), "msg": text.format(**args), "text": text,
+            "args": {key: str(value) for key, value in args.items()}}
+    if missing:
+        line["missing"] = list(missing)
+    print(json.dumps(line, ensure_ascii=False), flush=True)
     if not ok:
         failures.append(name)
 
@@ -309,20 +318,116 @@ class Init:
             run("dinitctl", "stop", service)
 
 
+# --------------------------------------------------------------- packages
+
+PACKAGE_MANAGERS = {
+    "pacman": ("pacman", "-S", "--needed", "--noconfirm"),
+    "apt-get": ("apt-get", "install", "-y"),
+    "dnf": ("dnf", "install", "-y"),
+    "zypper": ("zypper", "--non-interactive", "install"),
+    "xbps-install": ("xbps-install", "-Sy"),
+    "apk": ("apk", "add", "--update-cache"),
+}
+# Which of them is the distribution's own, by ID and ID_LIKE in os-release.
+DISTRIBUTIONS = {
+    "arch": "pacman", "artix": "pacman", "manjaro": "pacman",
+    "debian": "apt-get", "ubuntu": "apt-get", "devuan": "apt-get",
+    "fedora": "dnf", "rhel": "dnf", "centos": "dnf",
+    "suse": "zypper", "opensuse": "zypper",
+    "void": "xbps-install", "alpine": "apk",
+}
+# What HomeMesh may install, and the package that brings it: the first name,
+# unless the package manager has another. Nothing else can be installed.
+PACKAGES = {
+    "sshd": ("openssh", {"apt-get": "openssh-server", "dnf": "openssh-server"}),
+    "avahi": ("avahi", {"apt-get": "avahi-daemon"}),
+    "nss-mdns": ("nss-mdns", {"apt-get": "libnss-mdns", "apk": None}),  # musl has no such plug-ins
+    "gvfs": ("gvfs", {"apt-get": "gvfs-backends", "zypper": "gvfs-backends"}),
+    "bubblewrap": ("bubblewrap", {}),
+    "tailscale": ("tailscale", {}),
+}
+INSTALL_WAIT = 900
+
+
+def package_manager():
+    """The distribution's package manager, or None."""
+    forced = os.environ.get("HOMEMESH_HELPER_PM", "none") if TEST else "detect"
+    if forced != "detect":
+        return forced if forced in PACKAGE_MANAGERS else None
+    release = dict(re.findall(r"""(?m)^(ID|ID_LIKE)=["']?([^"'\n]*)""",
+                              read("/etc/os-release") or read("/usr/lib/os-release")))
+    for name in [release.get("ID", ""), *release.get("ID_LIKE", "").split()]:
+        manager = DISTRIBUTIONS.get(name) or DISTRIBUTIONS.get(name.split("-")[0])
+        if manager and shutil.which(manager):
+            return manager
+    return next((manager for manager in PACKAGE_MANAGERS if shutil.which(manager)), None)
+
+
+def package_names(manager, init, things):
+    names = []
+    for thing in things:
+        name, others = PACKAGES[thing]
+        name = others.get(manager, name)
+        if name:
+            names.append(name)
+            if thing in ("sshd", "avahi") and manager == "pacman" and init.kind not in ("systemd", "unknown"):
+                names.append(f"{name}-{init.kind}")  # Artix has the service in a package of its own
+    return names
+
+
+def install_packages(manager, names):
+    """None, or what the package manager said went wrong."""
+    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive", LC_ALL="C")
+    done = run(*PACKAGE_MANAGERS[manager], *names, env=env, timeout=INSTALL_WAIT)
+    if done.returncode != 0 and manager == "apt-get":  # its lists may be empty or too old
+        run("apt-get", "update", env=env, timeout=INSTALL_WAIT)
+        done = run(*PACKAGE_MANAGERS[manager], *names, env=env, timeout=INSTALL_WAIT)
+    if done.returncode == 0:
+        return None
+    # pacman's last line only says that errors occurred.
+    errors = re.findall(r"(?mi)^(?:error|e): *(.+)$", done.stderr)
+    return errors[-1] if errors else last_line(done.stderr) or last_line(done.stdout) or str(done.returncode)
+
+
+def install(init, things):
+    """Install what brings `things`. Says what was installed, or why not."""
+    manager = package_manager()
+    names = package_names(manager, init, things)
+    if not manager:
+        step("install", False, N_("HomeMesh does not know this system's package manager. Install these "
+                                  "packages with it: {packages}."), packages=", ".join(names))
+        return False
+    if not names:
+        return False
+    error = install_packages(manager, names)
+    if error:
+        step("install", False, N_("Could not install {packages} with {tool}: {error}. Update the system, "
+                                  "then try again."), packages=", ".join(names), tool=manager, error=error)
+        return False
+    step("install", True, N_("Installed {packages}."), packages=", ".join(names))
+    return True
+
+
+def provide(init, *things):
+    """Install `things` if the person agreed to that."""
+    return may_install and install(init, things)
+
+
 # ------------------------------------------------------------------- sshd
 
 def sshd_binary():
     for path in ("/usr/bin/sshd", "/usr/sbin/sshd"):
-        if os.path.exists(path):
+        if os.path.exists(P(path)):
             return path
-    return shutil.which("sshd")
+    return None if TEST else shutil.which("sshd")
 
 
-def configure_sshd():
+def configure_sshd(init):
+    if not sshd_binary():
+        provide(init, "sshd")
     sshd = sshd_binary()
     if not sshd:
-        step("sshd", False, N_("The SSH server is missing. Install the openssh package "
-                               "(on Artix also openssh-openrc, -runit, -s6 or -dinit)."))
+        step("sshd", False, N_("The SSH server is missing."), missing=["sshd"])
         return False
     if not re.search(r"(?mi)^\s*Include\s+/etc/ssh/sshd_config\.d/\*\.conf\s*$", read("/etc/ssh/sshd_config")):
         step("sshd", False, N_("/etc/ssh/sshd_config does not read the sshd_config.d directory. "
@@ -351,9 +456,11 @@ def start_sshd(init, state):
         step("service", False, N_("Unknown init system. Turn on the sshd service by hand."))
         return
     if not init.installed("sshd"):
-        step("service", False, N_("No sshd service for the {init} init system "
-                                  "(on Artix: the openssh-{init} package)."), init=init.kind)
-        return
+        own_package = len(package_names(package_manager(), init, ["sshd"])) > 1
+        if not (own_package and provide(init, "sshd") and init.installed("sshd")):
+            step("service", False, N_("The sshd service for the {init} init system is missing."), init=init.kind,
+                 missing=["sshd"] if own_package else [])
+            return
     if "sshd" not in state:
         state["sshd"] = {"enabled": init.enabled("sshd"), "running": init.running("sshd")}
     try:
@@ -459,15 +566,21 @@ def nss_mdns_available():
                                                      "/lib/libnss_mdns_minimal.so.2"))
 
 
-def ensure_nss_mdns(state):
+def ensure_nss_mdns(init, state):
     """With Avahi, name.local lookups go through nss-mdns in nsswitch.conf."""
-    text = read("/etc/nsswitch.conf")
-    match = re.search(r"(?m)^hosts:(.*)$", text)
+    hosts = re.compile(r"(?m)^hosts:(.*)$")
+    match = hosts.search(read("/etc/nsswitch.conf"))
     if not match or "mdns" in match.group(1):
         return True
     if not nss_mdns_available():
-        return False
+        provide(init, "nss-mdns")
+        if not nss_mdns_available():
+            return False
+    text = read("/etc/nsswitch.conf")  # once more: Debian's package edits it
+    match = hosts.search(text)
     tokens = match.group(1)
+    if "mdns" in tokens:
+        return True
     for anchor in (" resolve", " dns"):
         if anchor in tokens:
             tokens = tokens.replace(anchor, f" {NSS_MDNS}{anchor}", 1)
@@ -524,48 +637,48 @@ def ensure_resolved_mdns(init, state):
 
 
 def ensure_mdns(init, state):
-    avahi = init.installed("avahi-daemon")
     resolved = init.kind == "systemd" and init.running("systemd-resolved")
-    if avahi and init.running("avahi-daemon"):
-        if ensure_nss_mdns(state) or (resolved and resolved_mdns_on()):
-            step("mdns", True, N_(".local names work ({how})."), how="Avahi")
-        else:
-            step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
-        return
-    override = None
-    if resolved:
-        if ensure_resolved_mdns(init, state):
+    avahi = init.installed("avahi-daemon")
+    if not (avahi and init.running("avahi-daemon")):
+        override = None
+        if resolved:
+            if ensure_resolved_mdns(init, state):
+                return
+            override = resolved_mdns_override()
+            remove_mdns_dropins(init, state)
+        if avahi and init.masked("avahi-daemon"):
+            if override:
+                step("mdns", False, N_("MulticastDNS={value} in {path} keeps mDNS off in systemd-resolved. "
+                                       "Remove that line, then click “Fix”."), **override)
+            else:
+                step("mdns", False, N_("Could not turn on mDNS: the avahi-daemon service is masked. Run: sudo "
+                                       "systemctl unmask avahi-daemon.service avahi-daemon.socket, then "
+                                       "click “Fix”."))
             return
-        override = resolved_mdns_override()
-        remove_mdns_dropins(init, state)
-    masked = avahi and init.masked("avahi-daemon")
-    if avahi and not masked:
-        if "avahi" not in state:
-            state["avahi"] = {"enabled": init.enabled("avahi-daemon"), "running": False}
+        before = {"enabled": avahi and init.enabled("avahi-daemon"), "running": False}
+        if not avahi and provide(init, *mdns_missing(init)):
+            avahi = init.installed("avahi-daemon")
+        if not avahi:
+            step("mdns", False, N_("Avahi, the service that lets other computers find this one by name, "
+                                   "is missing."), missing=mdns_missing(init))
+            return
+        state.setdefault("avahi", before)
         try:
             init.enable("avahi-daemon")
             init.restart("avahi-daemon")
         except (RuntimeError, OSError) as error:
             step("mdns", False, N_("Could not start Avahi: {error}"), error=error)
             return
-        if ensure_nss_mdns(state):
-            step("mdns", True, N_(".local names work ({how})."), how="Avahi")
-        else:
-            step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
-        return
-    if override:
-        step("mdns", False, N_("MulticastDNS={value} in {path} keeps mDNS off in systemd-resolved. "
-                               "Remove that line, then click “Fix”."), **override)
-    elif masked:
-        step("mdns", False, N_("Could not turn on mDNS: the avahi-daemon service is masked. Run: sudo systemctl "
-                               "unmask avahi-daemon.service avahi-daemon.socket, then click “Fix”."))
-    elif resolved:
-        step("mdns", False, N_("Could not turn on mDNS in systemd-resolved. "
-                               "Install avahi and nss-mdns, then click “Fix”."))
+    if ensure_nss_mdns(init, state) or (resolved and resolved_mdns_on()):
+        step("mdns", True, N_(".local names work ({how})."), how="Avahi")
     else:
-        step("mdns", False, N_("No mDNS service, so other computers cannot find this one by name. "
-                               "Install: sudo pacman -S avahi nss-mdns (on Artix also avahi-{init}), "
-                               "then click “Fix”."), init=init.kind)
+        step("mdns", False, N_("The nss-mdns package, which finds other computers by name, is missing."),
+             missing=["nss-mdns"] if package_names(package_manager(), init, ["nss-mdns"]) else [])
+
+
+def mdns_missing(init):
+    return [thing for thing, there in (("avahi", init.installed("avahi-daemon")),
+                                       ("nss-mdns", nss_mdns_available())) if not there]
 
 
 def revert_mdns(init, state):
@@ -594,15 +707,6 @@ TAILSCALED_ARGS = ("--state=/var/lib/tailscale/tailscaled.state "
 TAILSCALE_WAIT = 20
 # pkexec's PATH has no /usr/local, where Tailscale's own build goes.
 BIN_DIRS = ("/usr/bin", "/usr/sbin", "/bin", "/sbin", "/usr/local/bin", "/usr/local/sbin")
-PACKAGE_MANAGERS = (
-    ("pacman", ("pacman", "-S", "--needed", "--noconfirm", "tailscale")),
-    ("apt-get", ("apt-get", "install", "-y", "tailscale")),
-    ("dnf", ("dnf", "install", "-y", "tailscale")),
-    ("zypper", ("zypper", "--non-interactive", "install", "tailscale")),
-    ("xbps-install", ("xbps-install", "-Sy", "tailscale")),
-    ("apk", ("apk", "add", "tailscale")),
-)
-
 # Service definitions for when the package brings none for this init system
 # (Arch's package on Artix, Tailscale's static build anywhere).
 SYSTEMD_UNIT = """\
@@ -686,13 +790,6 @@ def last_line(text):
     return lines[-1] if lines else ""
 
 
-def package_manager():
-    if TEST:
-        forced = os.environ.get("HOMEMESH_HELPER_PM", "none")
-        return next((item for item in PACKAGE_MANAGERS if item[0] == forced), None)
-    return next((item for item in PACKAGE_MANAGERS if shutil.which(item[0])), None)
-
-
 def fetch(url, limit):
     import urllib.request
     with urllib.request.urlopen(url, timeout=60) as response:
@@ -736,12 +833,11 @@ def install_tailscale():
     problems = []
     manager = package_manager()
     if manager:
-        name, command = manager
-        done = run(*command, env=dict(os.environ, DEBIAN_FRONTEND="noninteractive"), timeout=900)
-        if done.returncode == 0 and tool("tailscale") and tool("tailscaled"):
-            step("install", True, N_("Installed Tailscale with {tool}."), tool=name)
+        error = install_packages(manager, ["tailscale"])
+        if not error and tool("tailscale") and tool("tailscaled"):
+            step("install", True, N_("Installed Tailscale with {tool}."), tool=manager)
             return True
-        problems.append(f"{name}: {last_line(done.stderr) or last_line(done.stdout) or done.returncode}")
+        problems.append(f"{manager}: {error}")
     try:  # not in this distribution's repositories, or the package manager is busy
         version = install_static_tailscale()
     except (OSError, ValueError, KeyError, RuntimeError, tarfile.TarError) as error:
@@ -834,7 +930,7 @@ def allow_operator():
 def cmd_enable():
     init = Init()
     state = load_state()
-    if configure_sshd():
+    if configure_sshd(init):
         start_sshd(init, state)
         open_firewall(state)
         ensure_mdns(init, state)
@@ -897,6 +993,14 @@ def cmd_set_hostname(name):
     step("hostname", True, N_("This computer is now called {name} ({name}.local)."), name=name)
 
 
+def cmd_install(things):
+    unknown = [thing for thing in things if thing not in PACKAGES]
+    if unknown:
+        step("install", False, "{things}: unknown", things=", ".join(unknown))
+        return
+    install(Init(), things)
+
+
 def cmd_tailscale():
     if install_tailscale() and start_tailscale(Init()):
         allow_operator()
@@ -908,6 +1012,12 @@ def main(argv):
         return 2
     if len(argv) == 2 and argv[1] == "enable":
         cmd_enable()
+    elif argv[1:] == ["enable", "--install"]:
+        global may_install
+        may_install = True
+        cmd_enable()
+    elif len(argv) > 2 and argv[1] == "install":
+        cmd_install(argv[2:])
     elif len(argv) == 2 and argv[1] == "disable":
         cmd_disable()
     elif len(argv) == 3 and argv[1] == "set-hostname":
