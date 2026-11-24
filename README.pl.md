@@ -23,10 +23,10 @@ SSH/SFTP, które ma każdy Linux.
 | **Trzy kliknięcia** | *Włącz* udostępnianie, otwórz HomeMesh na drugim komputerze, kliknij *Połącz* i sprawdź, czy oba ekrany pokazują ten sam kod. Pasek u góry okna zawsze podpowiada następny krok, a gdy coś jest nie tak, proponuje naprawę. |
 | **Parowanie jak Bluetooth** | Komputery wymieniają klucze SSH i porównują sześciocyfrowy kod. Zgodne kody oznaczają, że nikt w sieci nie podmienił danych. Bez haseł, bez wpisywania adresów. |
 | **Przedstawianie** | Nowy komputer wystarczy połączyć z dowolnym członkiem grupy, a pozna wszystkich; ci, których nie spotkał, dowiedzą się o nim przy najbliższym kontakcie. Usunięcie komputera rozchodzi się tak samo. |
-| **Twój menedżer plików** | Połączone komputery są zakładkami w menedżerach GTK (GVfs) i w Dolphinie (KIO). Kliknięcie montuje; opcjonalnie montują się po zalogowaniu. |
+| **Twój menedżer plików** | Połączone komputery są zakładkami w menedżerach GTK (GVfs) i w Dolphinie (KIO). Kliknięcie montuje; opcjonalnie montują się po zalogowaniu. Wyłączony komputer ma dopisek: *(off) laptop*. |
 | **Wybierasz, co udostępniasz** | Cały katalog domowy albo tylko wybrane foldery, każdy do odczytu i zapisu albo tylko do odczytu. Wybrane foldery idą z piaskownicy: reszty katalogu domowego, kluczy i systemu po prostu tam nie ma. |
 | **Poza domem** | Jedno kliknięcie ustawia Tailscale: HomeMesh go instaluje, uruchamia i otwiera stronę logowania, bez żadnych poleceń. Masz już NetBird, ZeroTier, Yggdrasil, Nebula albo WireGuard? Wykryje je sam. Połączenie idzie przez sieć lokalną, gdy się da, a w przeciwnym razie przez VPN; zakładki zostają te same. |
-| **Lekki** | GTK 4 bez libadwaita, więc pasuje do każdego pulpitu. Bez demona: pliki podaje systemowy `sshd`, a okno jest potrzebne tylko do znajdowania i łączenia komputerów. Działa z systemd i bez niego. |
+| **Lekki** | GTK 4 bez libadwaita, więc pasuje do każdego pulpitu. Bez demona w systemie: pliki podaje systemowy `sshd`, okno jest potrzebne tylko do znajdowania i łączenia komputerów, a jeden mały proces w twojej sesji oznacza wyłączone. Działa z systemd i bez niego. |
 | **Także w terminalu** | Wszystko, co robi okno, zrobi też polecenie `homemesh`, więc dołączą również komputery bez ekranu. |
 
 ## Zrzuty ekranu
@@ -173,8 +173,8 @@ tego samego pomocnika (patrz [Poza domem](#poza-domem)); wyłączenie
 udostępniania zostawia Tailscale w spokoju.
 
 **Znajdowanie komputerów**: gdy okno jest otwarte, HomeMesh ogłasza się w sieci
-lokalnej rozgłoszeniem UDP. Działa to bez Avahi. Po zamknięciu okna nic
-dodatkowego nie nasłuchuje.
+lokalnej rozgłoszeniem UDP. Działa to bez Avahi. Po zamknięciu okna
+rozgłaszanie ustaje.
 
 **Parowanie** wymienia klucze SSH przez TCP. Kod liczony jest ze wszystkiego,
 co komputery wymieniły, a strona odpowiadająca najpierw zobowiązuje się do
@@ -203,6 +203,17 @@ rozchodzi.
 **Po zalogowaniu**: krótkie zadanie z autostartu (do wyłączenia) uzgadnia grupę
 i montuje komputery oznaczone *Podłączaj po zalogowaniu*, po czym się kończy.
 
+**Wyłączone komputery**: to samo ustawienie uruchamia `homemesh watch`, jeden
+proces zajmujący około 15 MB, który kończy się razem z sesją pulpitu. Dopisuje
+*(off)* przed nazwą zakładki, gdzie żaden menedżer plików go nie utnie, i
+zdejmuje, gdy komputer wróci; nazwy, które sam nadałeś zakładkom, zostają.
+Włączony komputer jest pytany raz na minutę jednym pakietem UDP pod jego adres
+(41753/udp); nic nie jest rozgłaszane i jego `sshd` nic nie zapisuje w
+dzienniku. Wyłączony jest wyszukiwany co pięć minut, ale po włączeniu widać go
+od razu, bo sam pyta pozostałe. Odpowiedź dostają tylko połączone komputery.
+Komputery z HomeMesh starszym niż 0.5 albo takie, na których nikt się nie
+zalogował, są zamiast tego sprawdzane połączeniem SSH co trzy minuty.
+
 ## Bezpieczeństwo
 
 - Przy udostępnionym całym katalogu domowym połączone komputery ufają sobie w
@@ -227,7 +238,7 @@ systemd (OpenRC, runit, s6, dinit) jest napisana, ale jeszcze nie sprawdzona na
 
 ## Dla programistów
 
-    make test                            # 47 testów; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 123 testy; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 

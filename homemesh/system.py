@@ -9,9 +9,10 @@ import socket
 import subprocess
 import sys
 import threading
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 
-from . import paths
+from . import paths, presence
 from .i18n import _
 from .util import is_lan, ssh_port
 
@@ -30,6 +31,21 @@ def port_open(host, port, timeout=1.5):
 
 def sshd_running():
     return port_open("127.0.0.1", ssh_port(), 1)
+
+
+def ssh_listening():
+    """Like sshd_running, but only looks: sshd logs every connection."""
+    wanted = f":{ssh_port():04X}"
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table) as lines:
+                for line in lines:
+                    fields = line.split()
+                    if len(fields) > 3 and fields[3] == "0A" and fields[1].endswith(wanted):
+                        return True
+        except OSError:
+            continue
+    return False
 
 
 def ready():
@@ -105,23 +121,48 @@ def _resolve(host, port, timeout=1.5):
     return found[0] if found else None
 
 
-def reach(peer):
-    """"lan", "vpn" or None: how this peer can be reached right now."""
-    address = _resolve(peer_host(peer), peer["port"])
-    if address and is_lan(address) and port_open(address, peer["port"], 1.5):
-        return "lan"
-    for item in peer.get("vpn") or []:
-        if port_open(item["addr"], peer["port"], 2.5):
-            return "vpn"
-    return None
+# How a paired computer can be reached: how ("lan", "vpn" or None), at which
+# address, and whether HomeMesh there answers questions (see presence.py).
+Reach = namedtuple("Reach", "how address answers")
+NOWHERE = Reach(None, None, False)
 
 
-def reachable(peers):
-    """{peer id: "lan", "vpn" or None}, checked in parallel."""
+def reach(peer, me=None, hint=None):
+    """How this peer can be reached right now. me: this computer's id; without
+    it, or when HomeMesh is not running there, an SSH connection tells. hint:
+    the local address it had last time, which saves looking its name up."""
+    port, tunnels = peer["port"], [item["addr"] for item in peer.get("vpn") or []]
+
+    def ask(address, how, tries=presence.TRIES):
+        ready = presence.ask(me, peer["id"], address, tries) if me and ":" not in address else None
+        return None if ready is None else Reach(how if ready else None, address, True)
+
+    answer = ask(hint, "lan") if hint and is_lan(hint) and hint not in tunnels else None
+    if answer:
+        return answer
+    address = _resolve(peer_host(peer), port)
+    if address and is_lan(address):
+        answer = ask(address, "lan") if address != hint else None
+        if answer:
+            return answer
+        if port_open(address, port, 1.5):
+            return Reach("lan", address, False)
+    for address in tunnels:
+        answer = ask(address, "vpn", presence.TRIES[-1:])
+        if answer:
+            return answer
+        if port_open(address, port, 2.5):
+            return Reach("vpn", address, False)
+    return NOWHERE
+
+
+def reachable(peers, me=None, hints=None):
+    """{peer id: Reach}, checked in parallel."""
     if not peers:
         return {}
+    hints = hints or {}
     with ThreadPoolExecutor(max_workers=8) as pool:
-        return dict(zip(peers, pool.map(reach, peers.values())))
+        return dict(zip(peers, pool.map(lambda pid: reach(peers[pid], me, hints.get(pid)), peers)))
 
 
 def step_text(step):
