@@ -4,7 +4,8 @@
 Exits 0 if HOST answers on PORT at a local network address, within about
 1.5 seconds; 1 otherwise. SSH runs it (Match ... exec) to decide whether to
 reach a paired computer on the local network or through its VPN address.
-Kept tiny so that every connection pays only a few milliseconds at home.
+Kept tiny (no imports beyond the standard library, python -IS): about
+40 ms per connection at home; away from home it gives up after a second.
 """
 
 import ipaddress

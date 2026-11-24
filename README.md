@@ -109,8 +109,9 @@ The simplest is Tailscale (free for personal use). On every computer:
 
 Then open HomeMesh on the computers while they are at home (or log in again):
 they exchange their VPN addresses. From then on every connection first checks
-the local network (a few milliseconds) and uses the VPN only when the other
-computer is not there. Away from home, files travel over your home's internet
+the local network (about 40 ms at home; away from home the check gives up
+after about a second) and uses the VPN only when the other computer is not
+there. Away from home, files travel over your home's internet
 uplink, so large files are slower than at home.
 
 ## What other computers see

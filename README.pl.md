@@ -107,8 +107,9 @@ Najprościej z Tailscale (darmowy do użytku domowego). Na każdym komputerze:
 
 Potem otwórz HomeMesh na komputerach, gdy są w domu (albo zaloguj się na nich
 ponownie): wymienią się adresami VPN. Od tej chwili każde połączenie najpierw
-sprawdza sieć lokalną (kilka milisekund), a VPN-u używa tylko wtedy, gdy
-drugiego komputera w niej nie ma. Poza domem pliki płyną przez łącze
+sprawdza sieć lokalną (w domu około 40 ms; poza domem sprawdzenie rezygnuje po
+mniej więcej sekundzie), a VPN-u używa tylko wtedy, gdy drugiego komputera w
+niej nie ma. Poza domem pliki płyną przez łącze
 internetowe domu, więc duże pliki idą wolniej niż w domu.
 
 ## Co widzą inne komputery
