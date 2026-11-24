@@ -213,6 +213,12 @@ Reports are welcome.
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 
+## Writing about HomeMesh
+
+Ready-made descriptions in English and Polish, from one line to a full
+feature list, are in [docs/descriptions.md](docs/descriptions.md); screenshots are in
+[docs/screenshots](docs/screenshots).
+
 ## License
 
 MIT

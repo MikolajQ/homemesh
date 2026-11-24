@@ -215,6 +215,12 @@ systemd (OpenRC, runit, s6, dinit) jest napisana, ale jeszcze nie sprawdzona na
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 
+## Jeśli piszesz o HomeMesh
+
+Gotowe opisy po angielsku i po polsku, od jednej linijki do pełnej listy
+funkcji, są w [docs/descriptions.md](docs/descriptions.md); zrzuty ekranu w
+[docs/screenshots](docs/screenshots).
+
 ## Licencja
 
 MIT
