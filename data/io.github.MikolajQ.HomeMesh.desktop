@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=HomeMesh
+GenericName=Home folder sharing
+GenericName[pl]=Udostępnianie katalogów domowych
+Comment=Open the home folders of your other computers in the file manager
+Comment[pl]=Otwieraj katalogi domowe swoich komputerów w menedżerze plików
+Exec=homemesh
+Icon=io.github.MikolajQ.HomeMesh
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=share;network;home;ssh;sftp;udostępnianie;sieć;dom;
+StartupNotify=true

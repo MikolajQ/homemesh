@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Start HomeMesh from a checkout or from the installed package."""
+
+import os
+import sys
+
+here = os.path.dirname(os.path.realpath(__file__))
+prefix = os.path.dirname(here)
+for candidate in (prefix, os.path.join(prefix, "lib", "homemesh")):
+    if os.path.isfile(os.path.join(candidate, "homemesh", "cli.py")):
+        sys.path.insert(0, candidate)
+        break
+
+from homemesh.cli import main  # noqa: E402
+
+sys.exit(main())

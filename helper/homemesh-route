@@ -1,0 +1,48 @@
+#!/usr/bin/python3 -IS
+"""homemesh-route HOST PORT
+
+Exits 0 if HOST answers on PORT at a local network address, within about
+1.5 seconds; 1 otherwise. SSH runs it (Match ... exec) to decide whether to
+reach a paired computer on the local network or through its VPN address.
+Kept tiny so that every connection pays only a few milliseconds at home.
+"""
+
+import ipaddress
+import os
+import socket
+import sys
+import threading
+
+LOCAL = [ipaddress.ip_network(net) for net in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "127.0.0.0/8")]
+
+
+def main():
+    if len(sys.argv) != 3 or not sys.argv[2].isdigit():
+        print(__doc__, file=sys.stderr, flush=True)
+        return 2
+    host, port = sys.argv[1], int(sys.argv[2])
+    found = []
+
+    def resolve():
+        try:
+            found.extend(socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM))
+        except OSError:
+            pass
+    # Away from home, a name.local lookup can take seconds to fail.
+    resolver = threading.Thread(target=resolve, daemon=True)
+    resolver.start()
+    resolver.join(1.0)
+    for *_rest, address in list(found):
+        if not any(ipaddress.ip_address(address[0]) in net for net in LOCAL):
+            continue
+        try:
+            socket.create_connection(address[:2], timeout=0.8).close()
+            return 0
+        except OSError:
+            continue
+    return 1
+
+
+if __name__ == "__main__":
+    os._exit(main())  # do not wait for a resolver still hanging

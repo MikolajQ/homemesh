@@ -1,0 +1,561 @@
+#!/usr/bin/python3 -I
+"""homemesh-helper: the few things HomeMesh needs root for.
+
+    homemesh-helper enable           sshd with key logins only, started at boot;
+                                     firewall open for the local network; mDNS
+    homemesh-helper disable          undo all of that (once no user needs it)
+    homemesh-helper set-hostname N   rename this computer
+
+Run through pkexec (from the window) or sudo (from a terminal). Prints one
+JSON object per step for the caller to show. Works with systemd, OpenRC,
+runit, s6 and dinit; with ufw or firewalld.
+
+Testing: as a normal user, HOMEMESH_HELPER_ROOT=/some/dir makes every path
+relative to that directory and HOMEMESH_HELPER_INIT picks the init system.
+Both are ignored when running as root.
+"""
+
+import json
+import os
+import pwd
+import re
+import shutil
+import socket
+import subprocess
+import sys
+
+TEST = os.geteuid() != 0 and "HOMEMESH_HELPER_ROOT" in os.environ
+ROOT = os.environ["HOMEMESH_HELPER_ROOT"] if TEST else "/"
+
+DROPIN = "/etc/ssh/sshd_config.d/10-homemesh.conf"
+STATE = "/var/lib/homemesh/state.json"
+RESOLVED_DROPIN = "/etc/systemd/resolved.conf.d/10-homemesh-mdns.conf"
+NM_DROPIN = "/etc/NetworkManager/conf.d/10-homemesh-mdns.conf"
+NSS_MDNS = "mdns_minimal [NOTFOUND=return]"
+PORT, PORT_SPAN = 41753, 10
+NETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+# VPNs whose addresses are not in the ranges above: only SSH is opened there
+# (pairing and discovery stay on the local network).
+VPN_INTERFACES = ("tailscale0", "wt0", "ygg0", "nebula1")
+VPN_SOURCES = (("ipv4", "100.64.0.0/10"), ("ipv6", "200::/7"))
+NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\Z")
+
+DROPIN_TEXT = """\
+# Managed by HomeMesh; removed by "homemesh disable".
+# HomeMesh pairs computers with keys, so password logins over the network
+# are not needed. They stay possible on the console as before.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+"""
+
+failures = []
+
+
+def P(path):
+    return os.path.join(ROOT, path.lstrip("/"))
+
+
+def step(name, ok, msg):
+    print(json.dumps({"step": name, "ok": bool(ok), "msg": msg}, ensure_ascii=False), flush=True)
+    if not ok:
+        failures.append(name)
+
+
+def run(*command, check=False, input=None):
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, input=input)
+    except FileNotFoundError:
+        done = subprocess.CompletedProcess(command, 127, "", f"{command[0]}: not found")
+    if check and done.returncode != 0:
+        raise RuntimeError(f"{' '.join(command)}: {done.stderr.strip() or done.returncode}")
+    return done
+
+
+def read(path):
+    try:
+        with open(P(path), encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
+
+
+def write(path, text, mode=0o644):
+    full = P(path)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    tmp = full + ".homemesh-new"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(tmp, mode)
+    os.replace(tmp, full)
+
+
+def remove(path):
+    try:
+        os.unlink(P(path))
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def load_state():
+    try:
+        return json.loads(read(STATE) or "{}")
+    except ValueError:
+        return {}
+
+
+def save_state(state):
+    if state.get("users"):
+        write(STATE, json.dumps(state, indent=1, sort_keys=True) + "\n", 0o600)
+    else:
+        remove(STATE)
+
+
+def calling_user():
+    for variable in ("PKEXEC_UID", "SUDO_UID"):
+        uid = os.environ.get(variable)
+        if uid and uid.isdigit():
+            return pwd.getpwuid(int(uid)).pw_name
+    return pwd.getpwuid(os.getuid()).pw_name
+
+
+# ------------------------------------------------------------ init systems
+
+class Init:
+    def __init__(self):
+        forced = os.environ.get("HOMEMESH_HELPER_INIT") if TEST else None
+        self.kind = forced or self.detect()
+
+    @staticmethod
+    def detect():
+        if os.path.isdir("/run/systemd/system"):
+            return "systemd"
+        if os.path.isdir("/run/openrc") or shutil.which("openrc-run"):
+            return "openrc"
+        if os.path.isdir("/run/runit") or os.path.isdir("/etc/runit"):
+            return "runit"
+        if os.path.isdir("/run/s6-rc") or shutil.which("s6-rc"):
+            return "s6"
+        if shutil.which("dinitctl"):
+            return "dinit"
+        return "unknown"
+
+    def name(self, service):
+        if self.kind == "systemd" and service == "sshd":
+            if run("systemctl", "cat", "sshd.service").returncode != 0 and \
+                    run("systemctl", "cat", "ssh.service").returncode == 0:
+                return "ssh"  # Debian's name
+        return service
+
+    def runit_dirs(self):
+        if os.path.isdir("/run/runit/service"):  # Artix
+            return "/etc/runit/sv", "/run/runit/service"
+        return "/etc/sv", "/var/service"  # Void
+
+    def installed(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            return run("systemctl", "cat", f"{service}.service").returncode == 0
+        if self.kind == "openrc":
+            return os.path.exists(f"/etc/init.d/{service}")
+        if self.kind == "runit":
+            return os.path.isdir(os.path.join(self.runit_dirs()[0], service))
+        if self.kind == "s6":
+            return os.path.isdir(f"/etc/s6/sv/{service}") or os.path.isdir(f"/etc/s6/adminsv/{service}")
+        if self.kind == "dinit":
+            return os.path.exists(f"/etc/dinit.d/{service}")
+        return False
+
+    def enabled(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            return run("systemctl", "is-enabled", f"{service}.service").stdout.strip() == "enabled"
+        if self.kind == "openrc":
+            return any(line.split("|")[0].strip() == service
+                       for line in run("rc-update", "show", "default").stdout.splitlines())
+        if self.kind == "runit":
+            return os.path.exists(os.path.join(self.runit_dirs()[1], service))
+        if self.kind == "s6":
+            out = run("s6-rc-db", "-c", "/etc/s6/rc/compiled", "contents", "default").stdout
+            return service in out.split() or f"{service}-srv" in out.split()
+        if self.kind == "dinit":
+            return os.path.exists(f"/etc/dinit.d/boot.d/{service}")
+        return False
+
+    def running(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            return run("systemctl", "is-active", "-q", f"{service}.service").returncode == 0
+        if self.kind == "openrc":
+            return run("rc-service", service, "status").returncode == 0
+        if self.kind == "runit":
+            return run("sv", "status", service).stdout.startswith("run:")
+        if self.kind == "s6":
+            out = run("s6-rc", "-a", "list").stdout.split()
+            return service in out or f"{service}-srv" in out
+        if self.kind == "dinit":
+            return "STARTED" in run("dinitctl", "status", service).stdout.upper()
+        return False
+
+    def enable(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            run("systemctl", "enable", f"{service}.service", check=True)
+        elif self.kind == "openrc":
+            run("rc-update", "add", service, "default", check=True)
+        elif self.kind == "runit":
+            sv, live = self.runit_dirs()
+            link = os.path.join(live, service)
+            if not os.path.exists(link):
+                os.symlink(os.path.join(sv, service), link)
+        elif self.kind == "s6":
+            run("s6-rc-bundle-update", "-c", "/etc/s6/rc/compiled", "add", "default", service, check=True)
+        elif self.kind == "dinit":
+            run("dinitctl", "enable", service, check=True)
+        else:
+            raise RuntimeError("unknown init system")
+
+    def disable(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            run("systemctl", "disable", f"{service}.service")
+        elif self.kind == "openrc":
+            run("rc-update", "del", service, "default")
+        elif self.kind == "runit":
+            link = os.path.join(self.runit_dirs()[1], service)
+            if os.path.islink(link):
+                os.unlink(link)
+        elif self.kind == "s6":
+            run("s6-rc-bundle-update", "-c", "/etc/s6/rc/compiled", "delete", "default", service)
+        elif self.kind == "dinit":
+            run("dinitctl", "disable", service)
+
+    def restart(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            run("systemctl", "restart", f"{service}.service", check=True)
+        elif self.kind == "openrc":
+            action = "restart" if self.running(service) else "start"
+            run("rc-service", service, action, check=True)
+        elif self.kind == "runit":
+            run("sv", "restart", service)  # a fresh link starts by itself within seconds
+        elif self.kind == "s6":
+            run("s6-rc", "-d", "change", service)
+            run("s6-rc", "-u", "change", service, check=True)
+        elif self.kind == "dinit":
+            run("dinitctl", "restart" if self.running(service) else "start", service, check=True)
+
+    def stop(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            run("systemctl", "stop", f"{service}.service")
+        elif self.kind == "openrc":
+            run("rc-service", service, "stop")
+        elif self.kind == "runit":
+            run("sv", "down", service)
+        elif self.kind == "s6":
+            run("s6-rc", "-d", "change", service)
+        elif self.kind == "dinit":
+            run("dinitctl", "stop", service)
+
+
+# ------------------------------------------------------------------- sshd
+
+def sshd_binary():
+    for path in ("/usr/bin/sshd", "/usr/sbin/sshd"):
+        if os.path.exists(path):
+            return path
+    return shutil.which("sshd")
+
+
+def configure_sshd():
+    sshd = sshd_binary()
+    if not sshd:
+        step("sshd", False, "Brak serwera SSH. Zainstaluj pakiet openssh "
+                            "(w Artix również openssh-openrc, -runit, -s6 lub -dinit).")
+        return False
+    if not re.search(r"(?mi)^\s*Include\s+/etc/ssh/sshd_config\.d/\*\.conf\s*$", read("/etc/ssh/sshd_config")):
+        step("sshd", False, "Plik /etc/ssh/sshd_config nie wczytuje katalogu sshd_config.d. "
+                            "Dopisz na jego początku: Include /etc/ssh/sshd_config.d/*.conf")
+        return False
+    if TEST:
+        run("ssh-keygen", "-A", "-f", ROOT)
+    else:
+        run("ssh-keygen", "-A")
+    previous = read(DROPIN) if os.path.exists(P(DROPIN)) else None
+    write(DROPIN, DROPIN_TEXT)
+    test = run(sshd, "-t") if not TEST else subprocess.CompletedProcess([], 0, "", "")
+    if test.returncode != 0:
+        if previous is None:
+            remove(DROPIN)
+        else:
+            write(DROPIN, previous)
+        step("sshd", False, "Serwer SSH odrzucił ustawienia: " + test.stderr.strip())
+        return False
+    step("sshd", True, "Logowanie przez sieć tylko kluczem, bez haseł; konto root zablokowane.")
+    return True
+
+
+def start_sshd(init, state):
+    if init.kind == "unknown":
+        step("service", False, "Nie rozpoznaję systemu startowego. Włącz usługę sshd ręcznie.")
+        return
+    if not init.installed("sshd"):
+        step("service", False, "Brak usługi sshd dla systemu startowego "
+                               f"{init.kind} (w Artix: pakiet openssh-{init.kind}).")
+        return
+    if "sshd" not in state:
+        state["sshd"] = {"enabled": init.enabled("sshd"), "running": init.running("sshd")}
+    try:
+        init.enable("sshd")
+        init.restart("sshd")
+    except (RuntimeError, OSError) as error:
+        step("service", False, f"Nie udało się uruchomić sshd: {error}")
+        return
+    step("service", True, "Serwer SSH działa i będzie startował razem z komputerem.")
+
+
+# --------------------------------------------------------------- firewall
+
+def firewall_kind():
+    if shutil.which("ufw") and "Status: active" in run("ufw", "status").stdout:
+        return "ufw"
+    if shutil.which("firewall-cmd") and run("firewall-cmd", "--state").stdout.strip() == "running":
+        return "firewalld"
+    return None
+
+
+def firewall_rules(kind):
+    span = f"{PORT}:{PORT + PORT_SPAN - 1}"
+    if kind == "ufw":
+        return [rule for net in NETS for rule in (
+            ["from", net, "to", "any", "port", "22", "proto", "tcp"],
+            ["from", net, "to", "any", "port", span, "proto", "tcp"],
+            ["from", net, "to", "any", "port", str(PORT), "proto", "udp"])] + \
+            [["in", "on", interface, "to", "any", "port", "22", "proto", "tcp"]
+             for interface in VPN_INTERFACES]
+    return [f'rule family="ipv4" source address="{net}" port port="{port}" protocol="{proto}" accept'
+            for net in NETS for port, proto in (("22", "tcp"), (span.replace(":", "-"), "tcp"),
+                                                (str(PORT), "udp"))] + \
+        [f'rule family="{family}" source address="{net}" port port="22" protocol="tcp" accept'
+         for family, net in VPN_SOURCES]
+
+
+def open_firewall(state):
+    kind = firewall_kind()
+    if kind is None:
+        step("firewall", True, "Nie wykryto zapory ufw ani firewalld, więc nic nie trzeba otwierać.")
+        return
+    rules = firewall_rules(kind)
+    for rule in rules:
+        if kind == "ufw":
+            run("ufw", "allow", *rule, "comment", "homemesh")
+        else:
+            run("firewall-cmd", "--permanent", "--add-rich-rule", rule)
+    if kind == "firewalld":
+        run("firewall-cmd", "--reload")
+    state["firewall"] = {"kind": kind, "rules": rules}
+    step("firewall", True, f"Zapora ({kind}): otwarte porty dla sieci lokalnej i SSH dla sieci VPN.")
+
+
+def close_firewall(state):
+    saved = state.pop("firewall", None)
+    if not saved:
+        return
+    for rule in saved["rules"]:
+        if saved["kind"] == "ufw":
+            run("ufw", "delete", "allow", *rule)
+        else:
+            run("firewall-cmd", "--permanent", "--remove-rich-rule", rule)
+    if saved["kind"] == "firewalld":
+        run("firewall-cmd", "--reload")
+    step("firewall", True, "Zapora: zamknięte porty otwarte dla HomeMesh.")
+
+
+# -------------------------------------------------------------------- mDNS
+
+def resolved_mdns_on():
+    out = run("resolvectl", "mdns").stdout
+    return bool(re.search(r"^Global: yes$", out, re.M) and re.search(r"^Link .*: yes$", out, re.M))
+
+
+def default_interface():
+    for line in read("/proc/net/route").splitlines()[1:]:
+        fields = line.split()
+        if len(fields) > 1 and fields[1] == "00000000":
+            return fields[0]
+    return None
+
+
+def nss_mdns_available():
+    return any(os.path.exists(path) for path in ("/usr/lib/libnss_mdns_minimal.so.2",
+                                                  "/usr/lib64/libnss_mdns_minimal.so.2",
+                                                  "/lib/libnss_mdns_minimal.so.2"))
+
+
+def ensure_nss_mdns(state):
+    """With Avahi, name.local lookups go through nss-mdns in nsswitch.conf."""
+    text = read("/etc/nsswitch.conf")
+    match = re.search(r"(?m)^hosts:(.*)$", text)
+    if not match or "mdns" in match.group(1):
+        return True
+    if not nss_mdns_available():
+        return False
+    tokens = match.group(1)
+    for anchor in (" resolve", " dns"):
+        if anchor in tokens:
+            tokens = tokens.replace(anchor, f" {NSS_MDNS}{anchor}", 1)
+            break
+    else:
+        tokens = f"{tokens} {NSS_MDNS}"
+    write("/etc/nsswitch.conf", text[:match.start(1)] + tokens + text[match.end(1):])
+    state["nsswitch"] = True
+    return True
+
+
+def ensure_mdns(init, state):
+    avahi = init.installed("avahi-daemon")
+    resolved = init.kind == "systemd" and init.running("systemd-resolved")
+    if avahi and init.running("avahi-daemon"):
+        if ensure_nss_mdns(state) or (resolved and resolved_mdns_on()):
+            step("mdns", True, "Nazwy .local działają (Avahi).")
+        else:
+            step("mdns", False, "Avahi działa, ale brak nss-mdns. Zainstaluj: sudo pacman -S nss-mdns")
+        return
+    if resolved:
+        if not resolved_mdns_on():
+            write(RESOLVED_DROPIN, "[Resolve]\nMulticastDNS=yes\n")
+            state.setdefault("created", []).append(RESOLVED_DROPIN)
+            if init.running("NetworkManager"):
+                write(NM_DROPIN, "[connection]\nconnection.mdns=2\n")
+                state["created"].append(NM_DROPIN)
+                run("nmcli", "general", "reload", "conf")
+            run("systemctl", "restart", "systemd-resolved.service")
+            interface = default_interface()
+            if interface:
+                run("resolvectl", "mdns", interface, "yes")
+        if resolved_mdns_on():
+            step("mdns", True, "Nazwy .local działają (systemd-resolved).")
+        else:
+            step("mdns", False, "Nie udało się włączyć mDNS w systemd-resolved. "
+                                "Zainstaluj avahi i nss-mdns, potem kliknij „Napraw”.")
+        return
+    if avahi:
+        if "avahi" not in state:
+            state["avahi"] = {"enabled": init.enabled("avahi-daemon"), "running": False}
+        try:
+            init.enable("avahi-daemon")
+            init.restart("avahi-daemon")
+        except (RuntimeError, OSError) as error:
+            step("mdns", False, f"Nie udało się uruchomić Avahi: {error}")
+            return
+        if ensure_nss_mdns(state):
+            step("mdns", True, "Nazwy .local działają (Avahi).")
+        else:
+            step("mdns", False, "Avahi działa, ale brak nss-mdns. Zainstaluj: sudo pacman -S nss-mdns")
+        return
+    step("mdns", False, "Brak usługi mDNS, więc inne komputery nie znajdą tego po nazwie. "
+                        "Zainstaluj: sudo pacman -S avahi nss-mdns (w Artix także avahi-"
+                        f"{init.kind}), potem kliknij „Napraw”.")
+
+
+def revert_mdns(init, state):
+    for path in state.pop("created", []):
+        remove(path)
+    if state.pop("nsswitch", False):
+        text = read("/etc/nsswitch.conf")
+        write("/etc/nsswitch.conf", text.replace(f" {NSS_MDNS}", "", 1))
+    avahi = state.pop("avahi", None)
+    if avahi and not avahi["enabled"]:
+        init.disable("avahi-daemon")
+        init.stop("avahi-daemon")
+    if init.kind == "systemd" and init.running("systemd-resolved"):
+        run("systemctl", "restart", "systemd-resolved.service")
+
+
+# ---------------------------------------------------------------- commands
+
+def cmd_enable():
+    init = Init()
+    state = load_state()
+    if configure_sshd():
+        start_sshd(init, state)
+        open_firewall(state)
+        ensure_mdns(init, state)
+    state["users"] = sorted(set(state.get("users", [])) | {calling_user()})
+    save_state(state)
+
+
+def cmd_disable():
+    init = Init()
+    state = load_state()
+    users = set(state.get("users", [])) - {calling_user()}
+    if users:
+        state["users"] = sorted(users)
+        save_state(state)
+        step("shared", True, "Inni użytkownicy tego komputera nadal udostępniają swoje katalogi, "
+                             "więc serwer SSH zostaje włączony.")
+        return
+    remove(DROPIN)
+    sshd = state.pop("sshd", {"enabled": True, "running": True})
+    if init.installed("sshd"):
+        if not sshd["enabled"]:
+            init.disable("sshd")
+        if sshd["running"]:
+            try:
+                init.restart("sshd")  # back to the settings without ours
+            except (RuntimeError, OSError):
+                pass
+        else:
+            init.stop("sshd")
+    step("sshd", True, "Serwer SSH wrócił do ustawień sprzed HomeMesh.")
+    close_firewall(state)
+    revert_mdns(init, state)
+    state["users"] = []
+    save_state(state)
+
+
+def cmd_set_hostname(name):
+    if not NAME_RE.match(name or ""):
+        step("hostname", False, "Nazwa może mieć małe litery, cyfry i myślniki (bez myślnika na początku i końcu).")
+        return
+    old = socket.gethostname()
+    init = Init()
+    if init.kind == "systemd" and shutil.which("hostnamectl") and not TEST:
+        done = run("hostnamectl", "set-hostname", name)
+        if done.returncode != 0:
+            step("hostname", False, done.stderr.strip())
+            return
+    else:
+        write("/etc/hostname", name + "\n")
+        if not TEST:
+            run("hostname", name)
+    hosts = read("/etc/hosts")
+    if old and re.search(rf"\b{re.escape(old)}\b", hosts):
+        lines = [re.sub(rf"\b{re.escape(old)}\b", name, line) if not line.lstrip().startswith("#") else line
+                 for line in hosts.splitlines()]
+        write("/etc/hosts", "\n".join(lines) + "\n")
+    if init.installed("avahi-daemon") and init.running("avahi-daemon"):
+        init.restart("avahi-daemon")
+    step("hostname", True, f"Ten komputer nazywa się teraz {name} ({name}.local).")
+
+
+def main(argv):
+    if os.geteuid() != 0 and not TEST:
+        print("homemesh-helper: run as root (pkexec or sudo)", file=sys.stderr)
+        return 2
+    if len(argv) == 2 and argv[1] == "enable":
+        cmd_enable()
+    elif len(argv) == 2 and argv[1] == "disable":
+        cmd_disable()
+    elif len(argv) == 3 and argv[1] == "set-hostname":
+        cmd_set_hostname(argv[2])
+    else:
+        print(__doc__, file=sys.stderr)
+        return 2
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
