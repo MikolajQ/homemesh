@@ -56,7 +56,8 @@ read-write or read-only, served from a sandbox.
 - **Introductions**: pair a new computer with any member and the whole group
   learns about it; removals spread the same way.
 - **In your file manager**: bookmarks for GTK file managers (GVfs) and
-  Dolphin (KIO); a click mounts, optionally at login.
+  Dolphin (KIO); a click mounts, optionally at login; computers that are
+  off are marked “(off)”.
 - **Choose what to share**: the whole home folder, or chosen folders, each
   read-write or read-only, served by sftp-server in a bubblewrap sandbox
   with no shell and no access to anything else.
@@ -65,7 +66,7 @@ read-write or read-only, served from a sandbox.
   ZeroTier, Yggdrasil, Nebula or WireGuard; each connection uses the local
   network when it can and the VPN otherwise.
 - **Light and universal**: GTK 4 without libadwaita, fits any desktop; no
-  daemon (the system's sshd serves the files); works with systemd, OpenRC,
+  system daemon (the system's sshd serves the files); works with systemd, OpenRC,
   runit, s6 or dinit; ufw and firewalld handled.
 - **Terminal too**: `homemesh status`, `pair`, `share`, `remove`… for
   computers without a screen.
@@ -142,7 +143,8 @@ piaskownicy.
 - **Przedstawianie**: nowy komputer połączony z dowolnym członkiem grupy staje
   się znany całej grupie; usunięcia rozchodzą się tak samo.
 - **W twoim menedżerze plików**: zakładki dla menedżerów GTK (GVfs) i
-  Dolphina (KIO); kliknięcie montuje, opcjonalnie po zalogowaniu.
+  Dolphina (KIO); kliknięcie montuje, opcjonalnie po zalogowaniu; wyłączone
+  komputery mają dopisek „(off)”.
 - **Wybierasz, co udostępniasz**: cały katalog domowy albo wybrane foldery,
   każdy do zapisu lub tylko do odczytu, podawane przez sftp-server w
   piaskownicy bubblewrap, bez powłoki i bez dostępu do czegokolwiek innego.
@@ -151,7 +153,7 @@ piaskownicy.
   ZeroTier, Yggdrasil, Nebula albo WireGuard; każde połączenie idzie przez
   sieć lokalną, gdy się da, a w przeciwnym razie przez VPN.
 - **Lekki i uniwersalny**: GTK 4 bez libadwaita, pasuje do każdego pulpitu;
-  bez demona (pliki podaje systemowy sshd); działa z systemd, OpenRC, runit,
+  bez demona w systemie (pliki podaje systemowy sshd); działa z systemd, OpenRC, runit,
   s6 i dinit; obsługuje ufw i firewalld.
 - **Także w terminalu**: `homemesh status`, `pair`, `share`, `remove`… dla
   komputerów bez ekranu.

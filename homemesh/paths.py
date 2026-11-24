@@ -48,6 +48,10 @@ def lock_file():
     return config_dir() / "lock"
 
 
+def watch_lock():
+    return config_dir() / "watch.lock"
+
+
 def identity():
     """The private key HomeMesh logs in with; the user's own keys stay untouched."""
     return config_dir() / "id_ed25519"
@@ -103,6 +107,15 @@ def helper():
         return INSTALLED_HELPER
     # Running from a checkout.
     return str(Path(__file__).resolve().parent.parent / "helper" / "homemesh-helper")
+
+
+def program():
+    """The command that starts HomeMesh, from a checkout or installed."""
+    package = Path(__file__).resolve().parent
+    for prefix in (package.parent, *package.parents[2:3]):
+        if (prefix / "bin" / "homemesh").is_file():
+            return [sys.executable, str(prefix / "bin" / "homemesh")]
+    return [sys.executable, "-m", "homemesh"]
 
 
 def route_command():

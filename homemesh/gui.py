@@ -19,7 +19,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from . import (APP_ID, APP_NAME, __version__, paths, proto, render, share, state, sync, system,  # noqa: E402
-               tailscale, vpn)
+               tailscale, vpn, watch)
 from .discovery import Discovery  # noqa: E402
 from .i18n import _  # noqa: E402
 from .pairing import Session  # noqa: E402
@@ -695,6 +695,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.gvfs = system.gvfs_sftp()
         self.gvfs_installed = False  # by us, but the session does not know it yet
         self.online = {}
+        self.hints = {}
         self.nearby = []
         self.peer_rows = {}
         self.session = None
@@ -751,8 +752,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.login_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         self.login_switch.connect("state-set", self._login_changed)
         login_texts = vbox(2, label(_("At login"), "heading"),
-                           label(_("Sync the group and connect the computers marked “Connect at "
-                                   "login”. Sharing works without this too."),
+                           label(_("Sync the group, connect the computers marked “Connect at login” "
+                                   "and keep the ones that are off marked “(off)” in the file "
+                                   "manager. Sharing works without this too."),
                                  "dim", "small", wrap=True))
         login_texts.set_hexpand(True)
         login_icon = Gtk.Image.new_from_icon_name("system-run-symbolic")
@@ -793,6 +795,7 @@ class MainWindow(Gtk.ApplicationWindow):
         with state.transaction() as st:
             state.own_card(st)  # creates the id and the login key on first start
         self.refresh_state()
+        watch.start(self.st)
         self._start_network()
         self.check_system()
         self.check_online()
@@ -971,7 +974,9 @@ class MainWindow(Gtk.ApplicationWindow):
         else:
             hint("done", OK_ICON, _("All set"),
                  _("Paired computers are in your file manager's sidebar. A new computer only needs "
-                   "pairing with one of them: the others learn about it by themselves."))
+                   "pairing with one of them: the others learn about it by themselves.")
+                 + (" " + _("Computers that are off are marked “(off)” there.")
+                    if self.st.get("login", True) else ""))
 
     # ------------------------------------------------------------- checks
 
@@ -991,17 +996,18 @@ class MainWindow(Gtk.ApplicationWindow):
         self.refresh_nearby()
 
     def check_online(self):
-        peers = dict(self.st["peers"])
+        peers, me, hints = dict(self.st["peers"]), self.st["id"], dict(self.hints)
 
         def work():
-            result = system.reachable(peers)
+            result = system.reachable(peers, me, hints)
             idle(self._online_checked, result)
         threading.Thread(target=work, daemon=True).start()
 
     def _online_checked(self, result):
         seen = {e["id"] for e in self.nearby}
-        for pid, how in result.items():
-            self.online[pid] = how or ("lan" if pid in seen else None)
+        for pid, reach in result.items():
+            self.hints[pid] = reach.address
+            self.online[pid] = reach.how or ("lan" if pid in seen else None)
             if pid in self.peer_rows:
                 self.peer_rows[pid].set_online(self.online[pid])
 
@@ -1071,6 +1077,7 @@ class MainWindow(Gtk.ApplicationWindow):
             st["login"] = wanted
             render.apply(st)
         self.st["login"] = wanted
+        watch.start(self.st) if wanted else watch.stop()
         switch.set_state(wanted)
         return True
 
@@ -1179,6 +1186,7 @@ class MainWindow(Gtk.ApplicationWindow):
             sync.sync_all()
             idle(self.refresh_state)
             idle(self.check_online)
+            idle(lambda: watch.start(self.st))
 
     def open_peer(self, pid):
         peer = self.st["peers"].get(pid)

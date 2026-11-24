@@ -23,10 +23,10 @@ Linux computer already has.
 | **Three clicks** | *Turn on* sharing, open HomeMesh on the other computer, click *Connect* and check that both screens show the same code. A bar at the top of the window always says what to do next and offers a fix when something is wrong. |
 | **Paired like Bluetooth** | Computers swap SSH keys and compare a six-digit code. If the codes match, nobody on the network tampered with the exchange. No passwords, no typing addresses. |
 | **Introductions** | Pair a new computer with any member of the group and it gets to know all of them; members it never met learn about it the next time they talk. Removing a computer spreads the same way. |
-| **Your file manager** | Paired computers appear as bookmarks in GTK file managers (GVfs) and in Dolphin (KIO). A click mounts; optionally they mount at login. |
+| **Your file manager** | Paired computers appear as bookmarks in GTK file managers (GVfs) and in Dolphin (KIO). A click mounts; optionally they mount at login. A computer that is off is marked: *(off) laptop*. |
 | **Choose what to share** | The whole home folder, or only chosen folders, each read-write or read-only. Chosen folders are served from a sandbox: the rest of your home, your keys and the system are simply not there. |
 | **Away from home** | One click sets up Tailscale: HomeMesh installs it, starts it and opens the login page; no commands. Already have NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? It finds them by itself. Each connection goes over the local network when possible and through the VPN otherwise, with the same bookmarks. |
-| **Light** | GTK 4 without libadwaita, so it fits any desktop. No daemon: sharing is the system's `sshd`; the window is needed only to find and pair computers. Works with or without systemd. |
+| **Light** | GTK 4 without libadwaita, so it fits any desktop. No system daemon: sharing is the system's `sshd`; the window is needed only to find and pair computers, and one small process in your session marks the ones that are off. Works with or without systemd. |
 | **Terminal too** | Everything the window does, `homemesh` does in a terminal, so headless machines can join. |
 
 ## Screenshots
@@ -173,8 +173,8 @@ the same helper (see [Away from home](#away-from-home)); turning sharing off
 leaves Tailscale alone.
 
 **Finding computers**: while the window is open, HomeMesh announces itself on
-the local network over UDP broadcast. This works without Avahi. Nothing extra
-listens once the window is closed.
+the local network over UDP broadcast. This works without Avahi. Broadcasting
+stops once the window is closed.
 
 **Pairing** swaps SSH keys over TCP. The code is computed from everything
 swapped, and the answering side first commits to its random number and reveals
@@ -202,6 +202,17 @@ removals leave a dated tombstone so they spread too.
 **At login**: a short task (XDG autostart, can be turned off) catches up with
 the group and mounts the computers marked *Connect at login*, then exits.
 
+**Computers that are off**: the same setting starts `homemesh watch`, one
+process of about 15 MB that ends with the desktop session. It puts *(off)* in
+front of a bookmark's name, where no file manager cuts it off, and takes it
+away again; names you gave the bookmarks stay. A computer that is on is asked
+once a minute with a single UDP packet to its own address (41753/udp); nothing
+is broadcast, and nothing is logged by its `sshd`. One that is off is looked up
+every five minutes, but is noticed at once when it starts, because it asks the
+others. Only paired computers get answers. Computers with HomeMesh older than
+0.5, or with nobody logged in, are checked with an SSH connection every three
+minutes instead.
+
 ## Security
 
 - With the whole home folder shared, paired computers trust each other
@@ -226,7 +237,7 @@ Reports are welcome.
 
 ## Development
 
-    make test                            # 47 tests; the integration tests run private sshd instances
+    make test                            # 123 tests; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 

@@ -28,11 +28,11 @@ def free_port():
         return sock.getsockname()[1]
 
 
-def wait_port(port, timeout=10):
+def wait_port(port, timeout=10, address="127.0.0.1"):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            with socket.create_connection((address, port), timeout=0.5):
                 return True
         except OSError:
             time.sleep(0.1)
@@ -40,8 +40,9 @@ def wait_port(port, timeout=10):
 
 
 class Computer:
-    def __init__(self, base, name, **env):
+    def __init__(self, base, name, listen="127.0.0.1", **env):
         self.name = name
+        self.listen = listen
         self.dir = base / name
         self.home = self.dir / "home"
         self.home.mkdir(parents=True)
@@ -69,14 +70,18 @@ class Computer:
         wrapper.chmod(0o755)
         config = self.dir / "sshd_config"
         config.write_text("\n".join([
-            f"Port {self.ssh_port}", "ListenAddress 127.0.0.1", f"HostKey {self.host_key}",
+            f"Port {self.ssh_port}", *(f"ListenAddress {a}" for a in sorted({"127.0.0.1", listen})),
+            f"HostKey {self.host_key}",
             f"PidFile {self.dir / 'sshd.pid'}", f"AuthorizedKeysFile {self.home / '.ssh/authorized_keys'}",
             "StrictModes no", "UsePAM no", "PasswordAuthentication no", "KbdInteractiveAuthentication no",
             f"ForceCommand {wrapper}", "LogLevel ERROR", ""]))
+        self.start()
+
+    def start(self):
         with open(self.dir / "sshd.log", "w") as log:
-            self.sshd = subprocess.Popen([SSHD, "-D", "-e", "-f", str(config)],
+            self.sshd = subprocess.Popen([SSHD, "-D", "-e", "-f", str(self.dir / "sshd_config")],
                                          stdout=subprocess.DEVNULL, stderr=log)
-        if not wait_port(self.ssh_port):
+        if not wait_port(self.ssh_port, address=self.listen):
             raise unittest.SkipTest(f"sshd did not start: {(self.dir / 'sshd.log').read_text()[-300:]}")
 
     def run(self, *args, timeout=60):
@@ -101,7 +106,17 @@ class Computer:
         path = self.home / ".ssh/authorized_keys"
         return path.read_text() if path.exists() else ""
 
+    def watch(self, port):
+        self.watcher = subprocess.Popen([sys.executable, "-m", "homemesh", "watch"], env={
+            **self.env, "HOMEMESH_PORT": str(port), "HOMEMESH_TEST_PACE": "0.1"})
+
+    def bookmarks(self):
+        return (self.home / ".config/gtk-3.0/bookmarks").read_text()
+
     def stop(self):
+        if getattr(self, "watcher", None):
+            self.watcher.terminate()
+            self.watcher.wait(5)
         self.sshd.terminate()
         self.sshd.wait(5)
 
@@ -209,6 +224,57 @@ class AwayTest(unittest.TestCase):
         self.assertNotIn("✗", report.stdout, report.stdout + report.stderr)
         status = self.alfa.run("status")
         self.assertIn("through VPN", status.stdout)
+
+
+@unittest.skipUnless(os.path.exists(SSHD) and shutil.which("ssh"), "needs OpenSSH")
+class MarksTest(unittest.TestCase):
+    """Two computers with the watcher running; one is turned off and on again."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="homemesh-marks-"))
+        cls.computers = []
+        try:
+            for name, address in (("alfa", "127.0.0.1"), ("beta", "127.0.0.2")):
+                cls.computers.append(Computer(cls.tmp, name, listen=address, HOMEMESH_ADVERTISE_ADDRESS=address))
+        except BaseException:
+            cls.tearDownClass()
+            raise
+        cls.alfa, cls.beta = cls.computers
+
+    @classmethod
+    def tearDownClass(cls):
+        for computer in cls.computers:
+            computer.stop()
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def wait_for(self, what, seconds):
+        line = f"sftp://beta.local{self.beta.home} {what}\n"
+        deadline = time.monotonic() + seconds
+        while line not in self.alfa.bookmarks() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertIn(line, self.alfa.bookmarks())
+
+    def test_off_and_on_again(self):
+        GroupTest.pair(self, self.alfa, self.beta)
+        port = free_port()
+        self.alfa.watch(port)
+        self.beta.watch(port)
+        time.sleep(2)
+        self.wait_for("beta", 0)
+        self.beta.stop()
+        self.wait_for("(off) beta", 10)
+        # Back on: noticed because beta asks alfa; alfa itself would look after 30 s only.
+        self.beta.start()
+        self.beta.watch(port)
+        self.wait_for("beta", 5)
+        # Without "bye", a computer that vanishes is noticed, too.
+        self.beta.watcher.kill()
+        self.beta.sshd.kill()
+        self.wait_for("(off) beta", 20)
+        self.alfa.watcher.terminate()
+        self.assertEqual(self.alfa.watcher.wait(5), 0)
+        self.wait_for("beta", 0)
 
 
 if __name__ == "__main__":

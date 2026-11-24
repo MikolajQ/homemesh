@@ -1,8 +1,8 @@
 """Finding other computers with HomeMesh open on the local network.
 
 Each one broadcasts a short UDP note every few seconds while its window is
-open. This works without Avahi or systemd-resolved, and nothing listens
-once HomeMesh is closed.
+open. This works without Avahi or systemd-resolved. (Computers that are
+already paired are watched quietly instead: see presence.py.)
 """
 
 import json

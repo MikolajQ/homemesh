@@ -7,7 +7,8 @@ import sys
 import threading
 import time
 
-from . import APP_NAME, PORT, __version__, paths, proto, render, share, state, sync, system, tailscale, vpn
+from . import (APP_NAME, PORT, __version__, paths, proto, render, share, state, sync, system, tailscale,
+               vpn, watch)
 from .discovery import Discovery
 from .i18n import _
 from .pairing import Session
@@ -67,17 +68,17 @@ def cmd_status(args):
     tunnels = card.get("vpn")
     print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
           else _("Away from home: not reachable. Set up Tailscale: homemesh away"))
-    print(_("At login: syncs the group and connects the chosen computers") if st.get("login", True)
-          else _("At login: nothing (turn on: homemesh autostart on)"))
+    print(_("At login: syncs the group, connects the chosen computers and marks the ones that are off")
+          if st.get("login", True) else _("At login: nothing (turn on: homemesh autostart on)"))
     peers = st["peers"]
     if not peers:
         print(_("Paired computers: none. Pair: homemesh pair"))
         return 0
     print(_("Paired computers:"))
-    online = system.reachable(peers)
+    online = system.reachable(peers, st["id"])
     names = render.aliases(st)
     for pid, peer in sorted(peers.items(), key=lambda kv: kv[1]["name"]):
-        status = {"lan": _("on the local network"), "vpn": _("through VPN")}.get(online.get(pid), _("not reachable"))
+        status = {"lan": _("on the local network"), "vpn": _("through VPN")}.get(online[pid].how, _("not reachable"))
         print(f"  {peer['name']:<16} {peer['user']}@{names[pid]:<24} {status:<12} {via_text(st, peer)}")
     return 0
 
@@ -276,6 +277,7 @@ def cmd_pair(args):
         return 1
     print(_("Catching up with the rest of the group…"))
     sync.sync_all()
+    watch.start(state.load())
     return cmd_status(args)
 
 
@@ -337,7 +339,8 @@ def mount_all(uris, timeout=60):
 
 
 def cmd_login(args):
-    """Run at login (XDG autostart): catch up with the group, mount chosen peers."""
+    """Run at login (XDG autostart): start the watcher, catch up with the group, mount chosen peers."""
+    watch.start(state.load())
     wait_for_network(30)
     sync.sync_all()
     st = state.load()
@@ -356,6 +359,7 @@ def cmd_reset(args):
     with state.transaction() as st:
         # A tombstone for ourselves tells the others to drop us.
         st["removed"][st["id"]] = time.time() + 1
+    watch.stop()
     sync.sync_all(rounds=1)
     with state.transaction() as st:
         st["peers"], st["removed"] = {}, {}
@@ -413,8 +417,10 @@ def cmd_autostart(args):
             st["login"] = args.state == "on"
             render.apply(st)
         on = st.get("login", True)
-    print(_("At login: syncs the group and connects the chosen computers") if on
-          else _("At login: nothing"))
+    if args.state:
+        watch.start(st) if on else watch.stop()
+    print(_("At login: syncs the group, connects the chosen computers and marks the ones that are off")
+          if on else _("At login: nothing"))
     return 0
 
 
@@ -456,14 +462,14 @@ def build_parser():
     shared.add_argument("path", nargs="?")
     shared.add_argument("--readonly", action="store_true", help=_("read-only folder"))
     shared.set_defaults(func=cmd_share)
-    autostart = sub.add_parser("autostart", help=_("syncing the group and connecting computers at "
-                                                   "login"))
+    autostart = sub.add_parser("autostart", help=_("syncing the group, connecting computers and marking "
+                                                   "the ones that are off, from login on"))
     autostart.add_argument("state", nargs="?", choices=("on", "off"))
     autostart.set_defaults(func=cmd_autostart)
     reset = sub.add_parser("reset", help=_("leave the group and remove HomeMesh's settings"))
     reset.add_argument("--yes", action="store_true")
     reset.set_defaults(func=cmd_reset)
-    for hidden, func in (("login", cmd_login), ("sync-serve", lambda a: sync.serve()),
+    for hidden, func in (("login", cmd_login), ("watch", lambda a: watch.run()), ("sync-serve", lambda a: sync.serve()),
                          ("gate", lambda a: share.gate()), ("apply", cmd_apply)):
         sub.add_parser(hidden).set_defaults(func=func)
     return parser

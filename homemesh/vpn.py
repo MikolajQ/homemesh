@@ -45,7 +45,7 @@ def allowed(address):
     return any(ip.version == net.version and ip in net for net in ALLOWED)
 
 
-def _links():
+def network_links():
     try:
         out = subprocess.run(["ip", "-j", "addr", "show", "up"], capture_output=True, text=True,
                              timeout=3).stdout
@@ -60,7 +60,7 @@ def addresses(links=None):
     if override is not None:
         return [{"addr": a, "kind": "VPN"} for a in override.split(",") if a]
     found = []
-    for link in links if links is not None else _links():
+    for link in links if links is not None else network_links():
         interface = link.get("ifname", "")
         for info in link.get("addr_info", []):
             address = info.get("local", "")

@@ -16,6 +16,9 @@ from .util import LAN_NETS, read_text, write_if_changed, write_text
 
 KEY_MARK_RE = re.compile(r"\shomemesh:[0-9a-f]{32}(\s|$)")
 INCLUDE_TAG = "# homemesh:"
+# In front of the name: file managers cut long names off at the end.
+OFF_MARK = "(off) "
+KDE_TITLE_RE = re.compile(r"(<title>)(.*?)(</title>)", re.S)
 KDE_BOOKMARK_RE = re.compile(r"[ \t]*<bookmark\b[^>]*>.*?</bookmark>[ \t]*\n?", re.S)
 
 
@@ -139,22 +142,33 @@ def _sync_list(st, key, desired, present_in_file):
     return [url for url in desired if url not in present_in_file and url not in before]
 
 
-def gtk_bookmarks(st, desired):
-    """desired: {uri: (label, peer id)}"""
+def with_mark(label, off):
+    """The bookmark's name for a computer that is off, or on. None: not known,
+    so the mark stays as it is. The name itself may be the person's own."""
+    if off is None:
+        return label
+    name = label.removeprefix(OFF_MARK)
+    return OFF_MARK + name if off else name
+
+
+def gtk_bookmarks(st, desired, marks):
+    """desired: {uri: (label, peer id)}; marks: {peer id: is it off}"""
     path = paths.gtk_bookmarks()
     current = read_text(path)
     ours_before = set(st.get("bookmarks", []))
     out, present = [], set()
     for line in current.splitlines():
-        url = line.split(" ", 1)[0]
+        url, _space, label = line.partition(" ")
         if url in ours_before or url in desired:
             if url in desired and url not in present:
-                out.append(f"{url} {desired[url][0]}")
+                name, pid = desired[url]
+                out.append(f"{url} {with_mark(label or name, marks.get(pid))}")
                 present.add(url)
             continue
         out.append(line)
     for url in _sync_list(st, "bookmarks", desired, present):
-        out.append(f"{url} {desired[url][0]}")
+        name, pid = desired[url]
+        out.append(f"{url} {with_mark(name, marks.get(pid))}")
     text = "".join(line + "\n" for line in out)
     if text != current and (path.exists() or out):
         write_text(path, text)
@@ -176,7 +190,7 @@ def _kde_block(url, label, pid, with_icon):
             " </bookmark>\n")
 
 
-def kde_places(st, desired):
+def kde_places(st, desired, marks):
     """Same as gtk_bookmarks, for KDE. Only if the person uses KDE already."""
     path = paths.kde_places()
     current = read_text(path)
@@ -192,12 +206,14 @@ def kde_places(st, desired):
         url = html.unescape(href.group(1)) if href else ""
         if url in desired and url not in present:
             present.add(url)
-            return block
+            return KDE_TITLE_RE.sub(lambda title: title[1] + html.escape(with_mark(
+                html.unescape(title[2]), marks.get(desired[url][1])), quote=False) + title[3], block, 1)
         return ""
 
     text = KDE_BOOKMARK_RE.sub(keep, current)
     with_icon = "xmlns:bookmark=" in text
-    added = "".join(_kde_block(url, desired[url][0], desired[url][1], with_icon)
+    added = "".join(_kde_block(url, with_mark(desired[url][0], marks.get(desired[url][1])),
+                               desired[url][1], with_icon)
                     for url in _sync_list(st, "kde", desired, present))
     if added:
         at = text.rfind("</xbel>")
@@ -220,14 +236,22 @@ def autostart(present):
         "[Desktop Entry]",
         "Type=Application",
         "Name=HomeMesh",
-        "Comment=Syncs the group and connects the chosen computers at login",
-        "Comment[pl]=Uzgadnia grupę i podłącza wybrane komputery po zalogowaniu",
+        "Comment=Syncs the group, connects the chosen computers and marks the ones that are off",
+        "Comment[pl]=Uzgadnia grupę, podłącza wybrane komputery i oznacza wyłączone",
         "Exec=homemesh login",
         f"Icon={APP_ID}",
         "NoDisplay=true",
         "X-GNOME-Autostart-Delay=5",
         "",
     ]))
+
+
+def bookmarks(st, marks):
+    """marks: {peer id: is it off}; a peer that is not there keeps the mark it has."""
+    names = aliases(st)
+    desired = {peer_uri(peer, names[pid]): (peer["name"], pid) for pid, peer in st["peers"].items()}
+    gtk_bookmarks(st, desired, marks)
+    kde_places(st, desired, marks)
 
 
 def apply(st):
@@ -247,7 +271,7 @@ def apply(st):
                 ssh_dir.mkdir(mode=0o700, parents=True)
             write_text(path, text, 0o600)
 
-    desired = {peer_uri(peer, names[pid]): (peer["name"], pid) for pid, peer in peers.items()}
-    gtk_bookmarks(st, desired)
-    kde_places(st, desired)
-    autostart(bool(peers) and st.get("login", True))
+    login = st.get("login", True)
+    # Without the watcher nobody would take the marks off.
+    bookmarks(st, {} if login else dict.fromkeys(peers, False))
+    autostart(bool(peers) and login)

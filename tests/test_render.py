@@ -110,6 +110,56 @@ class RenderTest(HomeTestCase):
             render.apply(st)
         self.assertEqual(paths.kde_places().read_text(), KDE_FILE)
 
+    def mark(self, marks):
+        with state.transaction() as st:
+            render.bookmarks(st, marks)
+
+    def test_marks_in_gtk_bookmarks(self):
+        paths.gtk_bookmarks().parent.mkdir(parents=True)
+        paths.gtk_bookmarks().write_text("file:///home/ania/Muzyka (off) Muzyka\n")
+        self.group(card("b", "beta", 10), card("c", "gamma", 11))
+
+        def lines():
+            return paths.gtk_bookmarks().read_text().splitlines()
+        self.mark({"b" * 32: True, "c" * 32: False})
+        marked = ["file:///home/ania/Muzyka (off) Muzyka", "sftp://beta.local/home/ania (off) beta",
+                  "sftp://gamma.local/home/ania gamma"]
+        self.assertEqual(lines(), marked)
+        self.mark({"b" * 32: True})  # twice is once; unknown stays as it was
+        self.assertEqual(lines(), marked)
+        with state.transaction() as st:  # so do other changes of the group
+            render.apply(st)
+        self.assertEqual(lines(), marked)
+        # A name the person gave stays, with and without the mark.
+        paths.gtk_bookmarks().write_text(paths.gtk_bookmarks().read_text().replace("(off) beta", "Beta mamy"))
+        self.mark({"b" * 32: True})
+        self.assertEqual(lines()[1], "sftp://beta.local/home/ania (off) Beta mamy")
+        self.mark({"b" * 32: False})
+        self.assertEqual(lines()[1], "sftp://beta.local/home/ania Beta mamy")
+        # Nobody to take the marks off: no marks.
+        self.mark({"b" * 32: True, "c" * 32: True})
+        with state.transaction() as st:
+            st["login"] = False
+            render.apply(st)
+        self.assertEqual(lines()[1:], ["sftp://beta.local/home/ania Beta mamy",
+                                       "sftp://gamma.local/home/ania gamma"])
+
+    def test_marks_in_kde_places(self):
+        paths.kde_places().parent.mkdir(parents=True)
+        paths.kde_places().write_text(KDE_FILE)
+        self.group(card("b", "beta", 10))
+        plain = paths.kde_places().read_text()
+        self.assertIn("<title>beta</title>", plain)
+        self.mark({"b" * 32: True})
+        self.assertEqual(paths.kde_places().read_text(), plain.replace(">beta<", ">(off) beta<"))
+        own = paths.kde_places().read_text().replace("(off) beta", "(off) Mama &amp; tata")
+        paths.kde_places().write_text(own)
+        self.mark({"b" * 32: True})
+        self.assertEqual(paths.kde_places().read_text(), own)
+        self.mark({"b" * 32: False})
+        self.assertEqual(paths.kde_places().read_text(), plain.replace(">beta<", ">Mama &amp; tata<"))
+        self.assertIn("<title>Home</title>", paths.kde_places().read_text())
+
     def test_two_peers_with_one_name(self):
         st = self.group(card("b", "beta", 10), card("c", "beta", 11))
         names = render.aliases(st)
