@@ -35,7 +35,7 @@ class Session:
             with state.transaction() as st:
                 offer = {"card": state.own_card(st, bump=True), "members": state.member_cards(st)}
             if offer["card"]["hostkey"] is None:
-                raise PairingError(_("Najpierw włącz udostępnianie na tym komputerze."))
+                raise PairingError(_("Enable sharing on this computer first."))
             if hello is None:
                 theirs, code = proto.initiate(self.chan, offer)
             else:
@@ -43,20 +43,20 @@ class Session:
             try:
                 card = state.validate_card(theirs["card"])
             except ValueError:
-                raise PairingError(_("Drugi komputer przysłał nieprawidłowe dane.")) from None
+                raise PairingError(_("The other computer sent invalid data.")) from None
             if card["id"] == offer["card"]["id"]:
-                raise PairingError(_("To ten sam komputer."))
+                raise PairingError(_("That is this computer."))
             self.conf = proto.Confirmation(self.chan)
             if self.cancelled:
                 self.conf.decide(False)
             self.ui.code(card, code)
             if not self.conf.wait_remote():
-                raise PairingError(_("Na komputerze {name} kliknięto „Nie zgadza się”. "
-                                     "Jeśli kody były różne, ktoś mógł podszyć się pod któryś komputer.")
+                raise PairingError(_("On {name}, “Does not match” was clicked. If the codes "
+                                     "differed, someone may have posed as one of the computers.")
                                    .format(name=card["name"]))
             self.ui.remote_confirmed()
             if not self.conf.wait_local():
-                raise PairingError(_("Anulowano."))
+                raise PairingError(_("Cancelled."))
             with state.transaction() as st:
                 state.pairing_apply(st, theirs["card"], theirs.get("members", []))
                 render.apply(st)

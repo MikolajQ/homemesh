@@ -6,12 +6,31 @@ DESTDIR ?=
 LIBDIR = $(PREFIX)/lib/homemesh
 APP_ID = io.github.MikolajQ.HomeMesh
 
-.PHONY: test install
+LANGUAGES = $(basename $(notdir $(wildcard po/*.po)))
+MO = $(foreach lang,$(LANGUAGES),build/locale/$(lang)/LC_MESSAGES/homemesh.mo)
+
+.PHONY: test install pot mo
 
 test:
 	python3 -m unittest discover -s tests
 
-install:
+# The template for translators, from the _() calls and the helper's N_() marks.
+pot:
+	xgettext --from-code=UTF-8 --language=Python --keyword=_ --keyword=N_ \
+	    --add-comments=Translators --package-name=homemesh --msgid-bugs-address=https://github.com/MikolajQ/homemesh/issues \
+	    --sort-by-file -o po/homemesh.pot homemesh/*.py helper/homemesh-helper
+	sed -i 's/charset=CHARSET/charset=UTF-8/' po/homemesh.pot
+	for po in po/*.po; do msgmerge --quiet --update --backup=none $$po po/homemesh.pot; done
+
+mo: $(MO)
+
+build/locale/%/LC_MESSAGES/homemesh.mo: po/%.po
+	mkdir -p $(dir $@)
+	msgfmt --check -o $@ $<
+
+install: mo
+	for lang in $(LANGUAGES); do install -Dm644 build/locale/$$lang/LC_MESSAGES/homemesh.mo \
+	    $(DESTDIR)$(PREFIX)/share/locale/$$lang/LC_MESSAGES/homemesh.mo; done
 	install -d $(DESTDIR)$(LIBDIR)/homemesh
 	install -m644 homemesh/*.py $(DESTDIR)$(LIBDIR)/homemesh/
 	install -Dm755 helper/homemesh-helper $(DESTDIR)$(LIBDIR)/homemesh-helper

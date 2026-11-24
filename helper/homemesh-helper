@@ -56,8 +56,18 @@ def P(path):
     return os.path.join(ROOT, path.lstrip("/"))
 
 
-def step(name, ok, msg):
-    print(json.dumps({"step": name, "ok": bool(ok), "msg": msg}, ensure_ascii=False), flush=True)
+def N_(text):
+    """Marks a message for translation; HomeMesh translates it, not this helper
+    (pkexec does not pass on the user's language)."""
+    return text
+
+
+def step(name, ok, text, /, **args):
+    """One line of JSON per step: the English text, plus the template and its
+    values so that the caller can show it in the person's language."""
+    print(json.dumps({"step": name, "ok": bool(ok), "msg": text.format(**args), "text": text,
+                      "args": {key: str(value) for key, value in args.items()}},
+                     ensure_ascii=False), flush=True)
     if not ok:
         failures.append(name)
 
@@ -272,12 +282,12 @@ def sshd_binary():
 def configure_sshd():
     sshd = sshd_binary()
     if not sshd:
-        step("sshd", False, "Brak serwera SSH. Zainstaluj pakiet openssh "
-                            "(w Artix również openssh-openrc, -runit, -s6 lub -dinit).")
+        step("sshd", False, N_("The SSH server is missing. Install the openssh package "
+                               "(on Artix also openssh-openrc, -runit, -s6 or -dinit)."))
         return False
     if not re.search(r"(?mi)^\s*Include\s+/etc/ssh/sshd_config\.d/\*\.conf\s*$", read("/etc/ssh/sshd_config")):
-        step("sshd", False, "Plik /etc/ssh/sshd_config nie wczytuje katalogu sshd_config.d. "
-                            "Dopisz na jego początku: Include /etc/ssh/sshd_config.d/*.conf")
+        step("sshd", False, N_("/etc/ssh/sshd_config does not read the sshd_config.d directory. "
+                               "Add at its top: Include /etc/ssh/sshd_config.d/*.conf"))
         return False
     if TEST:
         run("ssh-keygen", "-A", "-f", ROOT)
@@ -291,19 +301,19 @@ def configure_sshd():
             remove(DROPIN)
         else:
             write(DROPIN, previous)
-        step("sshd", False, "Serwer SSH odrzucił ustawienia: " + test.stderr.strip())
+        step("sshd", False, N_("The SSH server refused the settings: {error}"), error=test.stderr.strip())
         return False
-    step("sshd", True, "Logowanie przez sieć tylko kluczem, bez haseł; konto root zablokowane.")
+    step("sshd", True, N_("Network logins with keys only, no passwords; the root account is locked out."))
     return True
 
 
 def start_sshd(init, state):
     if init.kind == "unknown":
-        step("service", False, "Nie rozpoznaję systemu startowego. Włącz usługę sshd ręcznie.")
+        step("service", False, N_("Unknown init system. Turn on the sshd service by hand."))
         return
     if not init.installed("sshd"):
-        step("service", False, "Brak usługi sshd dla systemu startowego "
-                               f"{init.kind} (w Artix: pakiet openssh-{init.kind}).")
+        step("service", False, N_("No sshd service for the {init} init system "
+                                  "(on Artix: the openssh-{init} package)."), init=init.kind)
         return
     if "sshd" not in state:
         state["sshd"] = {"enabled": init.enabled("sshd"), "running": init.running("sshd")}
@@ -311,9 +321,9 @@ def start_sshd(init, state):
         init.enable("sshd")
         init.restart("sshd")
     except (RuntimeError, OSError) as error:
-        step("service", False, f"Nie udało się uruchomić sshd: {error}")
+        step("service", False, N_("Could not start sshd: {error}"), error=error)
         return
-    step("service", True, "Serwer SSH działa i będzie startował razem z komputerem.")
+    step("service", True, N_("The SSH server is running and will start with the computer."))
 
 
 # --------------------------------------------------------------- firewall
@@ -345,7 +355,7 @@ def firewall_rules(kind):
 def open_firewall(state):
     kind = firewall_kind()
     if kind is None:
-        step("firewall", True, "Nie wykryto zapory ufw ani firewalld, więc nic nie trzeba otwierać.")
+        step("firewall", True, N_("No ufw or firewalld firewall found, so there is nothing to open."))
         return
     rules = firewall_rules(kind)
     for rule in rules:
@@ -356,7 +366,8 @@ def open_firewall(state):
     if kind == "firewalld":
         run("firewall-cmd", "--reload")
     state["firewall"] = {"kind": kind, "rules": rules}
-    step("firewall", True, f"Zapora ({kind}): otwarte porty dla sieci lokalnej i SSH dla sieci VPN.")
+    step("firewall", True, N_("Firewall ({kind}): ports open for the local network, and SSH for VPNs."),
+         kind=kind)
 
 
 def close_firewall(state):
@@ -370,7 +381,7 @@ def close_firewall(state):
             run("firewall-cmd", "--permanent", "--remove-rich-rule", rule)
     if saved["kind"] == "firewalld":
         run("firewall-cmd", "--reload")
-    step("firewall", True, "Zapora: zamknięte porty otwarte dla HomeMesh.")
+    step("firewall", True, N_("Firewall: the ports opened for HomeMesh are closed again."))
 
 
 # -------------------------------------------------------------------- mDNS
@@ -419,9 +430,9 @@ def ensure_mdns(init, state):
     resolved = init.kind == "systemd" and init.running("systemd-resolved")
     if avahi and init.running("avahi-daemon"):
         if ensure_nss_mdns(state) or (resolved and resolved_mdns_on()):
-            step("mdns", True, "Nazwy .local działają (Avahi).")
+            step("mdns", True, N_(".local names work ({how})."), how="Avahi")
         else:
-            step("mdns", False, "Avahi działa, ale brak nss-mdns. Zainstaluj: sudo pacman -S nss-mdns")
+            step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
         return
     if resolved:
         if not resolved_mdns_on():
@@ -436,10 +447,10 @@ def ensure_mdns(init, state):
             if interface:
                 run("resolvectl", "mdns", interface, "yes")
         if resolved_mdns_on():
-            step("mdns", True, "Nazwy .local działają (systemd-resolved).")
+            step("mdns", True, N_(".local names work ({how})."), how="systemd-resolved")
         else:
-            step("mdns", False, "Nie udało się włączyć mDNS w systemd-resolved. "
-                                "Zainstaluj avahi i nss-mdns, potem kliknij „Napraw”.")
+            step("mdns", False, N_("Could not turn on mDNS in systemd-resolved. "
+                                   "Install avahi and nss-mdns, then click “Fix”."))
         return
     if avahi:
         if "avahi" not in state:
@@ -448,16 +459,16 @@ def ensure_mdns(init, state):
             init.enable("avahi-daemon")
             init.restart("avahi-daemon")
         except (RuntimeError, OSError) as error:
-            step("mdns", False, f"Nie udało się uruchomić Avahi: {error}")
+            step("mdns", False, N_("Could not start Avahi: {error}"), error=error)
             return
         if ensure_nss_mdns(state):
-            step("mdns", True, "Nazwy .local działają (Avahi).")
+            step("mdns", True, N_(".local names work ({how})."), how="Avahi")
         else:
-            step("mdns", False, "Avahi działa, ale brak nss-mdns. Zainstaluj: sudo pacman -S nss-mdns")
+            step("mdns", False, N_("Avahi is running but nss-mdns is missing. Install: sudo pacman -S nss-mdns"))
         return
-    step("mdns", False, "Brak usługi mDNS, więc inne komputery nie znajdą tego po nazwie. "
-                        "Zainstaluj: sudo pacman -S avahi nss-mdns (w Artix także avahi-"
-                        f"{init.kind}), potem kliknij „Napraw”.")
+    step("mdns", False, N_("No mDNS service, so other computers cannot find this one by name. "
+                           "Install: sudo pacman -S avahi nss-mdns (on Artix also avahi-{init}), "
+                           "then click “Fix”."), init=init.kind)
 
 
 def revert_mdns(init, state):
@@ -494,8 +505,8 @@ def cmd_disable():
     if users:
         state["users"] = sorted(users)
         save_state(state)
-        step("shared", True, "Inni użytkownicy tego komputera nadal udostępniają swoje katalogi, "
-                             "więc serwer SSH zostaje włączony.")
+        step("shared", True, N_("Other users of this computer still share their folders, "
+                                "so the SSH server stays on."))
         return
     remove(DROPIN)
     sshd = state.pop("sshd", {"enabled": True, "running": True})
@@ -509,7 +520,7 @@ def cmd_disable():
                 pass
         else:
             init.stop("sshd")
-    step("sshd", True, "Serwer SSH wrócił do ustawień sprzed HomeMesh.")
+    step("sshd", True, N_("The SSH server is back to its settings from before HomeMesh."))
     close_firewall(state)
     revert_mdns(init, state)
     state["users"] = []
@@ -518,14 +529,15 @@ def cmd_disable():
 
 def cmd_set_hostname(name):
     if not NAME_RE.match(name or ""):
-        step("hostname", False, "Nazwa może mieć małe litery, cyfry i myślniki (bez myślnika na początku i końcu).")
+        step("hostname", False, N_("A name may have lowercase letters, digits and hyphens "
+                                   "(no hyphen at the start or end)."))
         return
     old = socket.gethostname()
     init = Init()
     if init.kind == "systemd" and shutil.which("hostnamectl") and not TEST:
         done = run("hostnamectl", "set-hostname", name)
         if done.returncode != 0:
-            step("hostname", False, done.stderr.strip())
+            step("hostname", False, "{error}", error=done.stderr.strip())
             return
     else:
         write("/etc/hostname", name + "\n")
@@ -538,7 +550,7 @@ def cmd_set_hostname(name):
         write("/etc/hosts", "\n".join(lines) + "\n")
     if init.installed("avahi-daemon") and init.running("avahi-daemon"):
         init.restart("avahi-daemon")
-    step("hostname", True, f"Ten komputer nazywa się teraz {name} ({name}.local).")
+    step("hostname", True, N_("This computer is now called {name} ({name}.local)."), name=name)
 
 
 def main(argv):

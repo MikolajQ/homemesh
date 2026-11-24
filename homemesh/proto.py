@@ -52,22 +52,22 @@ class Channel:
         try:
             while b"\n" not in self.buffer:
                 if len(self.buffer) > MAX_LINE:
-                    raise PairingError(_("Drugi komputer przysłał za dużo danych."))
+                    raise PairingError(_("The other computer sent too much data."))
                 chunk = self.sock.recv(65536)
                 if not chunk:
-                    raise PairingError(_("Drugi komputer przerwał połączenie."))
+                    raise PairingError(_("The other computer closed the connection."))
                 self.buffer += chunk
         except socket.timeout:
-            raise PairingError(_("Drugi komputer nie odpowiada.")) from None
+            raise PairingError(_("The other computer does not answer.")) from None
         except OSError as error:
-            raise PairingError(_("Połączenie przerwane ({error}).").format(error=error.strerror or error)) from None
+            raise PairingError(_("Connection lost ({error}).").format(error=error.strerror or error)) from None
         line, self.buffer = self.buffer.split(b"\n", 1)
         try:
             message = json.loads(line)
         except ValueError:
-            raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego.")) from None
+            raise PairingError(_("The other computer sent something unexpected.")) from None
         if not isinstance(message, dict):
-            raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego."))
+            raise PairingError(_("The other computer sent something unexpected."))
         return message
 
     def close(self):
@@ -82,7 +82,7 @@ def connect(host, port):
     try:
         return Channel(socket.create_connection((host, port), timeout=STEP_TIMEOUT))
     except OSError as error:
-        raise PairingError(_("Nie mogę połączyć się z {host} ({error}). Czy HomeMesh jest tam otwarty?")
+        raise PairingError(_("Cannot connect to {host} ({error}). Is HomeMesh open there?")
                            .format(host=host, error=error.strerror or error)) from None
 
 
@@ -104,16 +104,17 @@ def _offer(message):
 def _nonce(message):
     value = message.get("n")
     if message.get("t") != "nonce" or not isinstance(value, str) or len(value) != 64:
-        raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego."))
+        raise PairingError(_("The other computer sent something unexpected."))
     try:
         return bytes.fromhex(value)
     except ValueError:
-        raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego.")) from None
+        raise PairingError(_("The other computer sent something unexpected.")) from None
 
 
 REFUSALS = {
-    "busy": lambda: _("Drugi komputer łączy się właśnie z innym. Spróbuj za chwilę."),
-    "not-ready": lambda: _("Na drugim komputerze udostępnianie jest wyłączone. Włącz je tam najpierw."),
+    "busy": lambda: _("The other computer is pairing with someone else right now. Try again in a "
+                      "moment."),
+    "not-ready": lambda: _("Sharing is off on the other computer. Turn it on there first."),
 }
 
 
@@ -124,27 +125,28 @@ def initiate(chan, offer):
     kind = reply.get("t")
     if kind == "refuse":
         reason = REFUSALS.get(reply.get("reason"))
-        raise PairingError(reason() if reason else _("Drugi komputer odmówił."))
+        raise PairingError(reason() if reason else _("The other computer refused."))
     if kind != "hello" or not isinstance(reply.get("commit"), str):
-        raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego."))
+        raise PairingError(_("The other computer sent something unexpected."))
     if reply.get("v") != VERSION:
-        raise PairingError(_("Drugi komputer ma inną wersję HomeMesh. Zaktualizuj oba."))
+        raise PairingError(_("The other computer has a different version of HomeMesh. Update both."))
     theirs = _offer(reply)
     nonce_a = os.urandom(32)
     chan.send({"t": "nonce", "n": nonce_a.hex()})
     nonce_b = _nonce(chan.recv())
     if not hmac.compare_digest(_commit(nonce_b, theirs), reply["commit"]):
-        raise PairingError(_("Dane od drugiego komputera się nie zgadzają: ktoś mógł się pod niego podszyć. Przerwano."))
+        raise PairingError(_("The data from the other computer does not add up: someone may be "
+                             "posing as it. Stopped."))
     return theirs, _code(offer, theirs, nonce_a, nonce_b)
 
 
 def read_hello(chan):
     hello = chan.recv()
     if hello.get("t") != "hello":
-        raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego."))
+        raise PairingError(_("The other computer sent something unexpected."))
     if hello.get("v") != VERSION:
         refuse(chan, "version")
-        raise PairingError(_("Drugi komputer ma inną wersję HomeMesh. Zaktualizuj oba."))
+        raise PairingError(_("The other computer has a different version of HomeMesh. Update both."))
     return hello
 
 
@@ -190,10 +192,10 @@ class Confirmation:
             message = self.chan.recv(timeout)
         except PairingError:
             if self.local is False:
-                raise PairingError(_("Anulowano.")) from None
+                raise PairingError(_("Cancelled.")) from None
             raise
         if message.get("t") != "confirm":
-            raise PairingError(_("Drugi komputer przysłał coś niezrozumiałego."))
+            raise PairingError(_("The other computer sent something unexpected."))
         return message.get("ok") is True
 
     def wait_local(self, timeout=DECIDE_TIMEOUT):

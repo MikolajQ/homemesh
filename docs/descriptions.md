@@ -9,8 +9,9 @@ mediów społecznościowych, po angielsku i po polsku: od jednej linijki do
 pełnej listy funkcji.
 
 - Repository: https://github.com/MikolajQ/homemesh
-- AUR: https://aur.archlinux.org/packages/homemesh-git
-- Screenshots: `docs/screenshots/` (light and dark)
+- AUR: https://aur.archlinux.org/packages/homemesh (release), https://aur.archlinux.org/packages/homemesh-git (development)
+- Interface: English and Polish
+- Screenshots: `docs/screenshots/en/` and `docs/screenshots/pl/` (light and dark)
 - License: MIT
 
 ---

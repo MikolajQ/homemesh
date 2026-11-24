@@ -36,7 +36,7 @@ def peer_uri(peer, alias):
 
 
 def ssh_config_text(st, names):
-    lines = [_("# Wygenerowane przez homemesh. Nie edytuj: zmiany zostaną nadpisane."), ""]
+    lines = ["# Written by homemesh. Do not edit: changes are overwritten.", ""]
     for pid, peer in sorted(st["peers"].items(), key=lambda kv: names[kv[0]]):
         local = peer.get("address") or peer["name"] + ".local"
         tunnels = peer.get("vpn") or []
@@ -107,7 +107,7 @@ def authorized_keys_text(st, current):
 
 
 def include_lines():
-    return [_("# homemesh: dostęp do połączonych komputerów (usuwa to „homemesh reset”)"),
+    return ["# homemesh: access to paired computers (removed by \"homemesh reset\")",
             f'Include "{paths.ssh_config()}"']
 
 
@@ -220,7 +220,8 @@ def autostart(present):
         "[Desktop Entry]",
         "Type=Application",
         "Name=HomeMesh",
-        "Comment=" + _("Uzgadnia grupę i podłącza wybrane komputery po zalogowaniu"),
+        "Comment=Syncs the group and connects the chosen computers at login",
+        "Comment[pl]=Uzgadnia grupę i podłącza wybrane komputery po zalogowaniu",
         "Exec=homemesh login",
         f"Icon={APP_ID}",
         "NoDisplay=true",

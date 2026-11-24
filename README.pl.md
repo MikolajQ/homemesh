@@ -12,8 +12,8 @@ Bez Samby, bez NFS, bez serwera do utrzymania: pod spodem działa zwykłe
 SSH/SFTP, które ma każdy Linux.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-  <img alt="Okno HomeMesh: ten komputer z przełącznikiem udostępniania, co widzą inne komputery, dostęp spoza domu i zadania po zalogowaniu; połączone komputery z ich stanem; komputer w pobliżu gotowy do połączenia" src="docs/screenshots/overview-light.png" width="544">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/overview-dark.png">
+  <img alt="Okno HomeMesh: ten komputer z przełącznikiem udostępniania, co widzą inne komputery, dostęp spoza domu i zadania po zalogowaniu; połączone komputery z ich stanem; komputer w pobliżu gotowy do połączenia" src="docs/screenshots/pl/overview-light.png" width="544">
 </picture>
 
 ## W skrócie
@@ -38,15 +38,15 @@ SSH/SFTP, które ma każdy Linux.
 **Parowanie**: oba komputery pokazują ten sam kod.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pair-dark.png">
-  <img alt="Okno parowania z kodem 482 913 i przyciskami Nie zgadza się i Zgadza się" src="docs/screenshots/pair-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/pair-dark.png">
+  <img alt="Okno parowania z kodem 482 913 i przyciskami Nie zgadza się i Zgadza się" src="docs/screenshots/pl/pair-light.png">
 </picture>
 
 **Co widzą inne komputery**: wszystko albo wybrane foldery.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/share-dark.png">
-  <img alt="Okno udostępniania: cały katalog domowy albo tylko wybrane foldery, Publiczny do odczytu i zapisu, Muzyka tylko do odczytu" src="docs/screenshots/share-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/share-dark.png">
+  <img alt="Okno udostępniania: cały katalog domowy albo tylko wybrane foldery, Publiczny do odczytu i zapisu, Muzyka tylko do odczytu" src="docs/screenshots/pl/share-light.png">
 </picture>
 
 </td>
@@ -55,8 +55,8 @@ SSH/SFTP, które ma każdy Linux.
 **Poza domem**: jak dodać VPN.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/away-dark.png">
-  <img alt="Okno pomocy o dostępie spoza domu przez Tailscale" src="docs/screenshots/away-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/away-dark.png">
+  <img alt="Okno pomocy o dostępie spoza domu przez Tailscale" src="docs/screenshots/pl/away-light.png">
 </picture>
 
 </td>
@@ -65,9 +65,10 @@ SSH/SFTP, które ma każdy Linux.
 
 ## Instalacja
 
-Z AUR:
+Z AUR, najnowsze wydanie albo wersja rozwojowa:
 
-    paru -S homemesh-git      # albo: yay -S homemesh-git
+    paru -S homemesh          # albo: yay -S homemesh
+    paru -S homemesh-git
 
 Z kopii repozytorium:
 
@@ -199,7 +200,7 @@ i montuje komputery oznaczone *Podłączaj po zalogowaniu*, po czym się kończy
 
 ## Stan
 
-Wersja 0.1: młoda. Sprawdzona między dwoma komputerami z systemami opartymi
+Wersja 0.2: młoda. Sprawdzona między dwoma komputerami z systemami opartymi
 na Archu, jednym z GNOME i jednym z KDE Plasma; obsługa Dolphina i systemów bez
 systemd (OpenRC, runit, s6, dinit) jest napisana, ale jeszcze nie sprawdzona na
 żywo. Zgłoszenia mile widziane.
@@ -207,13 +208,21 @@ systemd (OpenRC, runit, s6, dinit) jest napisana, ale jeszcze nie sprawdzona na
 ## Odinstalowanie
 
     homemesh reset && homemesh disable
-    sudo pacman -R homemesh-git
+    sudo pacman -R homemesh      # albo homemesh-git
 
 ## Dla programistów
 
-    make test                            # 44 testy; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 47 testów; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
+
+## Tłumaczenia
+
+Interfejs mówi po angielsku i po polsku. Teksty w kodzie są angielskie, a
+tłumaczenia idą przez gettext; polskie są w `po/pl.po`. Nowy język: `make pot`,
+skopiuj `po/homemesh.pot` do `po/<język>.po`, przetłumacz (pola `{…}` zostają),
+potem `make mo` i `LANGUAGE=<język> bin/homemesh`. `make test` sprawdza, czy
+każdy tekst ma tłumaczenie z tymi samymi polami.
 
 ## Jeśli piszesz o HomeMesh
 

@@ -132,8 +132,8 @@ class GroupTest(unittest.TestCase):
         waited, _ = waiting.communicate(timeout=60)
         self.assertEqual(asked.returncode, 0, asked.stdout + asked.stderr)
         self.assertEqual(waiting.returncode, 0, waited)
-        codes = [line.split("Kod:")[1].strip() for line in (asked.stdout + "\n" + waited).splitlines()
-                 if "Kod:" in line]
+        codes = [line.split("Code:")[1].strip() for line in (asked.stdout + "\n" + waited).splitlines()
+                 if "Code:" in line]
         self.assertEqual(len(codes), 2, codes)
         self.assertEqual(codes[0], codes[1])
 
@@ -208,7 +208,7 @@ class AwayTest(unittest.TestCase):
         self.assertEqual(report.returncode, 0)
         self.assertNotIn("✗", report.stdout, report.stdout + report.stderr)
         status = self.alfa.run("status")
-        self.assertIn("przez VPN", status.stdout)
+        self.assertIn("through VPN", status.stdout)
 
 
 if __name__ == "__main__":

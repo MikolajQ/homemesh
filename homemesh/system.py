@@ -101,6 +101,17 @@ def reachable(peers):
         return dict(zip(peers, pool.map(reach, peers.values())))
 
 
+def step_text(step):
+    """A helper step in the person's language (the helper itself cannot know it)."""
+    text, args = step.get("text"), step.get("args")
+    if isinstance(text, str) and isinstance(args, dict):
+        try:
+            return _(text).format(**args)
+        except (KeyError, IndexError, ValueError):
+            pass
+    return str(step.get("msg", ""))
+
+
 class HelperResult:
     def __init__(self, ok, steps, error=None):
         self.ok, self.steps, self.error = ok, steps, error
@@ -116,7 +127,8 @@ def run_helper(args, terminal=False):
     elif shutil.which("pkexec"):
         command = ["pkexec", helper, *args]
     else:
-        return HelperResult(False, [], _("Brak pkexec (pakiet polkit). Uruchom w terminalu: sudo homemesh enable"))
+        return HelperResult(False, [], _("pkexec is missing (polkit package). In a terminal run: "
+                                         "sudo homemesh enable"))
     try:
         done = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except OSError as error:
@@ -132,8 +144,9 @@ def run_helper(args, terminal=False):
         return HelperResult(True, steps)
     if command[0] == "pkexec" and done.returncode in (126, 127) and not steps:
         if "authentication agent" in done.stderr.lower():
-            return HelperResult(False, [], _("Brak okna logowania administratora (agenta polkit). "
-                                             "Uruchom w terminalu: sudo homemesh {cmd}").format(cmd=args[0]))
-        return HelperResult(False, [], _("Nie udzielono uprawnień administratora."))
+            return HelperResult(False, [], _("No window to ask for the administrator password "
+                                             "(polkit agent). In a terminal run: sudo homemesh "
+                                             "{cmd}").format(cmd=args[0]))
+        return HelperResult(False, [], _("Administrator permission was not given."))
     error = done.stderr.strip().splitlines()
     return HelperResult(False, steps, error[-1] if error else None)

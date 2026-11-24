@@ -179,7 +179,7 @@ class Dialog(Gtk.Window):
 def confirm(parent, title, text, action, callback):
     dialog = Dialog(parent, title)
     dialog.content(label(title, "big", wrap=True), label(text, wrap=True))
-    dialog.add_button(_("Anuluj"), dialog.close)
+    dialog.add_button(_("Cancel"), dialog.close)
 
     def accept():
         dialog.close()
@@ -198,33 +198,34 @@ class StepsDialog(Dialog):
             icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic" if item.get("ok")
                                                 else "dialog-warning-symbolic")
             icon.set_valign(Gtk.Align.START)
-            self.content(hbox(10, icon, label(item.get("msg", ""), wrap=True, chars=50)))
+            self.content(hbox(10, icon, label(system.step_text(item), wrap=True, chars=50)))
         if result.error:
             self.content(label(result.error, wrap=True))
-        self.add_button(_("Zamknij"), self.close, "suggested-action")
+        self.add_button(_("Close"), self.close, "suggested-action")
 
 
 class RenameDialog(Dialog):
     def __init__(self, parent, current, callback):
-        super().__init__(parent, _("Nazwa komputera"))
+        super().__init__(parent, _("Computer name"))
         self.callback = callback
         self.entry = Gtk.Entry(text=current)
         self.entry.connect("changed", self._changed)
         self.entry.connect("activate", lambda *_a: self._apply())
         self.error = label("", "dim", "small", wrap=True)
-        self.content(label(_("Nazwa komputera w sieci"), "big"),
-                     label(_("Inne komputery zobaczą go pod tą nazwą. Dozwolone są małe litery, "
-                             "cyfry i myślniki, np. „laptop-ani”."), wrap=True),
+        self.content(label(_("Computer name on the network"), "big"),
+                     label(_("Other computers will see it under this name. Lowercase letters, "
+                             "digits and hyphens, for example “annas-laptop”."), wrap=True),
                      self.entry, self.error)
-        self.add_button(_("Anuluj"), self.close)
-        self.ok = self.add_button(_("Zmień"), self._apply, "suggested-action")
+        self.add_button(_("Cancel"), self.close)
+        self.ok = self.add_button(_("Change"), self._apply, "suggested-action")
         self._changed()
 
     def _changed(self, *_args):
         name = self.entry.get_text().strip().lower()
         valid = bool(NAME_RE.match(name))
         self.ok.set_sensitive(valid)
-        self.error.set_text("" if valid or not name else _("Tylko małe litery, cyfry i myślniki."))
+        self.error.set_text("" if valid or not name else _("Only lowercase letters, digits and "
+                                                           "hyphens."))
 
     def _apply(self):
         name = self.entry.get_text().strip().lower()
@@ -237,27 +238,28 @@ class VpnHelpDialog(Dialog):
     """How to reach the computers away from home."""
 
     def __init__(self, parent):
-        super().__init__(parent, _("Poza domem"), 520)
+        super().__init__(parent, _("Away from home"), 520)
         commands = label("sudo pacman -S tailscale\nsudo systemctl enable --now tailscaled\nsudo tailscale up",
                          "dim")
         commands.set_selectable(True)
         commands.add_css_class("monospace")
         commands.set_margin_start(12)
         self.content(
-            label(_("Dostęp spoza domu"), "big"),
-            label(_("W domu komputery łączą się przez sieć lokalną. Poza domem potrzebny jest VPN, który "
-                    "połączy je przez internet; HomeMesh sam wykrywa Tailscale, NetBird, ZeroTier, Yggdrasil, "
-                    "Nebula i WireGuard i korzysta z nich, gdy komputera nie ma w sieci lokalnej. "
-                    "Zakładki w menedżerze plików działają wtedy tak samo w domu i w podróży."), wrap=True),
-            label(_("Najprościej z Tailscale (darmowe konto do użytku domowego):"), "heading", wrap=True),
-            label(_("1. Na każdym komputerze zainstaluj Tailscale i zaloguj się tym samym kontem:"), wrap=True),
+            label(_("Access from away"), "big"),
+            label(_("At home computers talk over the local network. Away from home they need a VPN "
+                    "to reach each other over the internet; HomeMesh detects Tailscale, NetBird, "
+                    "ZeroTier, Yggdrasil, Nebula and WireGuard on its own and uses them when a "
+                    "computer is not on the local network. Your file manager's bookmarks then work "
+                    "the same at home and on the road."), wrap=True),
+            label(_("The simplest is Tailscale (a free account for personal use):"), "heading", wrap=True),
+            label(_("1. On every computer, install Tailscale and log in with the same account:"), wrap=True),
             commands,
-            label(_("2. Otwórz HomeMesh na komputerach, gdy są w domu, albo zaloguj się na nich ponownie: "
-                    "wymienią się adresami VPN. Nic więcej nie trzeba ustawiać."), wrap=True),
-            label(_("Poza domem pliki płyną przez łącze internetowe domu, więc duże pliki idą wolniej "
-                    "niż w sieci lokalnej."), "dim", "small", wrap=True))
-        self.add_button(_("Strona Tailscale"), self._website)
-        self.set_focus(self.add_button(_("Zamknij"), self.close, "suggested-action"))
+            label(_("2. Open HomeMesh on the computers while they are at home, or log in to them "
+                    "again: they exchange their VPN addresses. Nothing else to set up."), wrap=True),
+            label(_("Away from home, files travel over your home's internet uplink, so large files "
+                    "are slower than on the local network."), "dim", "small", wrap=True))
+        self.add_button(_("Tailscale website"), self._website)
+        self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
 
     def _website(self):
         Gtk.UriLauncher.new("https://tailscale.com/download/linux").launch(self, None, None, None)
@@ -267,34 +269,34 @@ class ShareDialog(Dialog):
     """The whole home folder, or chosen folders, each read-only or not."""
 
     def __init__(self, parent, current, callback):
-        super().__init__(parent, _("Co udostępniać"), 540)
+        super().__init__(parent, _("What to share"), 540)
         self.callback = callback
         self.folders = [dict(folder) for folder in current["folders"]]
         available = share.sandbox_available()
-        self.home = Gtk.CheckButton(label=_("Cały katalog domowy"))
-        self.chosen = Gtk.CheckButton(label=_("Tylko wybrane foldery"), group=self.home)
+        self.home = Gtk.CheckButton(label=_("The whole home folder"))
+        self.chosen = Gtk.CheckButton(label=_("Only chosen folders"), group=self.home)
         self.home.set_active(current["mode"] == "home" or not available)
         self.chosen.set_active(current["mode"] == "folders" and available)
         self.chosen.set_sensitive(available)
-        home_note = label(_("Połączone komputery mają taki dostęp jak ty: widzą i zmieniają wszystko, "
-                            "łącznie z ustawieniami i kluczami."), "dim", "small", wrap=True)
-        chosen_note = label(_("Połączone komputery widzą tylko te foldery. Reszta katalogu domowego, "
-                              "ustawienia i klucze są dla nich niewidoczne.")
-                            + ("" if available else "\n" + _("Potrzebny jest pakiet bubblewrap.")),
+        home_note = label(_("Paired computers get the same access as you: they see and change "
+                            "everything, settings and keys included."), "dim", "small", wrap=True)
+        chosen_note = label(_("Paired computers see only these folders. The rest of your home "
+                              "folder, your settings and your keys are invisible to them.")
+                            + ("" if available else "\n" + _("Needs the bubblewrap package.")),
                             "dim", "small", wrap=True)
         for note in (home_note, chosen_note):
             note.set_margin_start(28)
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.list.add_css_class("boxed")
-        self.list.set_placeholder(label(_("Nie wybrano jeszcze żadnego folderu."), "dim", "placeholder"))
+        self.list.set_placeholder(label(_("No folder chosen yet."), "dim", "placeholder"))
         self.list.set_margin_start(28)
-        self.pick = button(_("Dodaj folder…"), self._pick)
+        self.pick = button(_("Add folder…"), self._pick)
         self.pick.set_halign(Gtk.Align.START)
         self.pick.set_margin_start(28)
-        self.content(label(_("Co widzą połączone komputery"), "big"),
+        self.content(label(_("What paired computers see"), "big"),
                      self.home, home_note, self.chosen, chosen_note, self.list, self.pick)
-        self.add_button(_("Anuluj"), self.close)
-        self.save = self.add_button(_("Zapisz"), self._save, "suggested-action")
+        self.add_button(_("Cancel"), self.close)
+        self.save = self.add_button(_("Save"), self._save, "suggested-action")
         self.home.connect("toggled", lambda *_a: self._update())
         self._rebuild()
 
@@ -306,10 +308,10 @@ class ShareDialog(Dialog):
             where.set_ellipsize(Pango.EllipsizeMode.START)
             texts = vbox(2, name, where)
             texts.set_hexpand(True)
-            readonly = Gtk.CheckButton(label=_("Tylko odczyt"), active=folder["readonly"])
+            readonly = Gtk.CheckButton(label=_("Read-only"), active=folder["readonly"])
             readonly.connect("toggled", lambda check, f=folder: f.update(readonly=check.get_active()))
             remove = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER,
-                                tooltip_text=_("Usuń z listy"))
+                                tooltip_text=_("Remove from the list"))
             remove.add_css_class("flat")
             remove.connect("clicked", lambda *_a, f=folder: (self.folders.remove(f), self._rebuild()))
             row = Gtk.ListBoxRow(activatable=False)
@@ -324,7 +326,7 @@ class ShareDialog(Dialog):
         self.save.set_sensitive(not chosen or bool(self.folders))
 
     def _pick(self):
-        dialog = Gtk.FileDialog(title=_("Wybierz folder do udostępnienia"), modal=True)
+        dialog = Gtk.FileDialog(title=_("Choose a folder to share"), modal=True)
         dialog.set_initial_folder(Gio.File.new_for_path(str(paths.home())))
         dialog.select_folder(self, None, self._picked)
 
@@ -350,8 +352,8 @@ class PairDialog(Dialog):
     """Connecting → the code → done or failed."""
 
     def __init__(self, parent, name, asking, session):
-        title = _("Łączenie z {name}").format(name=name) if asking \
-            else _("{name} chce się połączyć").format(name=name)
+        title = _("Pairing with {name}").format(name=name) if asking \
+            else _("{name} wants to pair").format(name=name)
         super().__init__(parent, title, 460)
         self.window = parent
         self.session = session
@@ -363,15 +365,15 @@ class PairDialog(Dialog):
 
         spinner = Gtk.Spinner(spinning=True, halign=Gtk.Align.CENTER)
         spinner.set_size_request(32, 32)
-        self.wait_text = label(_("Łączenie z {name}…").format(name=name), wrap=True, xalign=0.5)
+        self.wait_text = label(_("Connecting to {name}…").format(name=name), wrap=True, xalign=0.5)
         self.stack.add_named(vbox(12, spinner, self.wait_text, margin=12), "wait")
 
         self.code_title = label(title, "big", wrap=True, xalign=0.5)
         self.code_label = label("", "code", xalign=0.5)
         self.code_text = label("", wrap=True, xalign=0.5)
         self.status = label("", "dim", wrap=True, xalign=0.5)
-        warning = label(_("Połączone komputery mają pełny dostęp do swoich katalogów domowych. "
-                          "Łącz tylko własne komputery."), "dim", "small", wrap=True, xalign=0.5)
+        warning = label(_("Paired computers have full access to each other's home folders. Pair "
+                          "only your own computers."), "dim", "small", wrap=True, xalign=0.5)
         self.stack.add_named(vbox(10, self.code_title, self.code_label, self.code_text, warning,
                                   self.status), "code")
 
@@ -381,7 +383,7 @@ class PairDialog(Dialog):
         self.result_text = label("", wrap=True, xalign=0.5)
         self.stack.add_named(vbox(10, self.result_icon, self.result_title, self.result_text, margin=6),
                              "result")
-        self.add_button(_("Anuluj"), self.close)
+        self.add_button(_("Cancel"), self.close)
         self.connect("close-request", self._closing)
 
     def _closing(self, *_args):
@@ -393,51 +395,52 @@ class PairDialog(Dialog):
         self.peer = card
         self.name = card["name"]
         self.code_label.set_text(code)
-        self.code_text.set_text(_("Sprawdź, czy na komputerze {name} widać ten sam kod. Jeśli tak, "
-                                  "kliknij „Zgadza się” na obu komputerach.").format(name=self.name))
+        self.code_text.set_text(_("Check that {name} shows the same code. If it does, click "
+                                  "“Matches” on both computers.").format(name=self.name))
         self.status.set_text("")
         self.stack.set_visible_child_name("code")
         self.clear_buttons()
-        self.add_button(_("Nie zgadza się"), lambda: self._decide(False))
-        self.yes = self.add_button(_("Zgadza się"), lambda: self._decide(True), "suggested-action")
+        self.add_button(_("Does not match"), lambda: self._decide(False))
+        self.yes = self.add_button(_("Matches"), lambda: self._decide(True), "suggested-action")
         self.present()
 
     def _decide(self, ok):
         self.session.decide(ok)
         if ok:
             self.clear_buttons()
-            self.add_button(_("Anuluj"), self.close)
+            self.add_button(_("Cancel"), self.close)
             if not self.status.get_text():
-                self.status.set_text(_("Czekam na potwierdzenie na komputerze {name}…").format(name=self.name))
+                self.status.set_text(_("Waiting for confirmation on {name}…").format(name=self.name))
 
     def remote_confirmed(self):
         if self.session.conf and self.session.conf.local is None:
-            self.status.set_text(_("Na komputerze {name} kod się zgadza.").format(name=self.name))
+            self.status.set_text(_("{name} says the code matches.").format(name=self.name))
         else:
             self.status.set_text("")
 
     def done(self, card):
         self.finished = True
         self.result_icon.set_from_icon_name("emblem-ok-symbolic")
-        self.result_title.set_text(_("Połączono z {name}").format(name=card["name"]))
-        self.result_text.set_text(_("Katalog domowy komputera {name} jest teraz w panelu bocznym menedżera "
-                                    "plików. Pozostałe komputery z grupy dowiedzą się o nim same.")
+        self.result_title.set_text(_("Paired with {name}").format(name=card["name"]))
+        self.result_text.set_text(_("The home folder of {name} is now in your file manager's "
+                                    "sidebar. The other computers in the group will learn about it "
+                                    "by themselves.")
                                   .format(name=card["name"]))
         self.stack.set_visible_child_name("result")
         self.clear_buttons()
-        self.add_button(_("Zamknij"), self.close)
-        self.add_button(_("Otwórz"), lambda: (self.close(), self.window.open_peer(card["id"])),
+        self.add_button(_("Close"), self.close)
+        self.add_button(_("Open"), lambda: (self.close(), self.window.open_peer(card["id"])),
                         "suggested-action")
         self.present()
 
     def failed(self, message):
         self.finished = True
         self.result_icon.set_from_icon_name("dialog-warning-symbolic")
-        self.result_title.set_text(_("Nie połączono"))
+        self.result_title.set_text(_("Not paired"))
         self.result_text.set_text(message)
         self.stack.set_visible_child_name("result")
         self.clear_buttons()
-        self.add_button(_("Zamknij"), self.close, "suggested-action")
+        self.add_button(_("Close"), self.close, "suggested-action")
         self.present()
 
 
@@ -481,15 +484,15 @@ class PeerRow(Gtk.ListBoxRow):
         self.subtitle = label("", "dim", "small", ellipsize=True)
         texts = vbox(2, self.title, self.subtitle)
         texts.set_hexpand(True)
-        open_button = button(_("Otwórz"), lambda: window.open_peer(pid))
+        open_button = button(_("Open"), lambda: window.open_peer(pid))
 
         menu = Gtk.MenuButton(icon_name="view-more-symbolic", valign=Gtk.Align.CENTER,
-                              tooltip_text=_("Więcej"))
+                              tooltip_text=_("More"))
         menu.add_css_class("flat")
         popover = Gtk.Popover()
-        automount = Gtk.CheckButton(label=_("Podłączaj po zalogowaniu"), active=peer.get("automount", False))
+        automount = Gtk.CheckButton(label=_("Connect at login"), active=peer.get("automount", False))
         automount.connect("toggled", lambda check: window.set_automount(pid, check.get_active()))
-        remove = Gtk.Button(label=_("Usuń z grupy…"))
+        remove = Gtk.Button(label=_("Remove from the group…"))
         remove.add_css_class("flat")
         remove.connect("clicked", lambda *_a: (popover.popdown(), window.ask_remove(pid)))
         popover.set_child(vbox(4, automount, remove, margin=6))
@@ -503,13 +506,13 @@ class PeerRow(Gtk.ListBoxRow):
             self.dot.remove_css_class(css)
         self.dot.add_css_class("dot-on" if how in ("lan", "vpn", True) else "dot-off")
         if how == "checking":
-            status = _("sprawdzam…")
+            status = _("checking…")
         elif how in ("lan", True):
-            status = _("dostępny w sieci lokalnej")
+            status = _("reachable on the local network")
         elif how == "vpn":
-            status = _("dostępny przez VPN")
+            status = _("reachable through VPN")
         else:
-            status = _("niedostępny")
+            status = _("not reachable")
         self.subtitle.set_text(f"{self.peer['user']}@{self.alias} · {status} · {self.via}")
 
 
@@ -517,12 +520,12 @@ class NearbyRow(Gtk.ListBoxRow):
     def __init__(self, window, entry, can_pair):
         super().__init__(activatable=False)
         title = label(entry["name"], "heading", ellipsize=True)
-        note = _("gotowy do połączenia") if entry["ready"] else _("udostępnianie wyłączone")
+        note = _("ready to pair") if entry["ready"] else _("sharing is off")
         subtitle = label(f"{entry['user']} · {entry['ip']} · {note}", "dim", "small", ellipsize=True)
         texts = vbox(2, title, subtitle)
         texts.set_hexpand(True)
         icon = Gtk.Image.new_from_icon_name("computer-symbolic")
-        connect = button(_("Połącz"), lambda: window.start_pairing(entry), "suggested-action")
+        connect = button(_("Connect"), lambda: window.start_pairing(entry), "suggested-action")
         connect.set_sensitive(entry["ready"] and can_pair)
         self.set_child(hbox(12, icon, texts, connect))
 
@@ -547,8 +550,8 @@ class MainWindow(Gtk.ApplicationWindow):
 
         header = Gtk.HeaderBar()
         menu = Gio.Menu()
-        menu.append(_("Uzgodnij grupę teraz"), "app.sync")
-        menu.append(_("O programie"), "app.about")
+        menu.append(_("Sync the group now"), "app.sync")
+        menu.append(_("About"), "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                        tooltip_text=_("Menu")))
         self.set_titlebar(header)
@@ -557,7 +560,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.this_name = label("", "big", ellipsize=True)
         self.this_text = label("", "dim", "small", wrap=True)
-        self.switch = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text=_("Udostępnianie"))
+        self.switch = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text=_("Sharing"))
         self.switch.connect("state-set", self._switch_changed)
         self._switch_guard = False
         computer = Gtk.Image.new_from_icon_name("computer-symbolic")
@@ -571,28 +574,28 @@ class MainWindow(Gtk.ApplicationWindow):
         this_list.append(row)
 
         self.share_text = label("", "dim", "small", wrap=True)
-        share_texts = vbox(2, label(_("Co widzą inne komputery"), "heading"), self.share_text)
+        share_texts = vbox(2, label(_("What other computers see"), "heading"), self.share_text)
         share_texts.set_hexpand(True)
         folder_icon = Gtk.Image.new_from_icon_name("folder-remote-symbolic")
         folder_icon.set_pixel_size(24)
         row = Gtk.ListBoxRow(activatable=False)
-        row.set_child(hbox(12, folder_icon, share_texts, button(_("Zmień…"), self.ask_share)))
+        row.set_child(hbox(12, folder_icon, share_texts, button(_("Change…"), self.ask_share)))
         this_list.append(row)
 
         self.away_text = label("", "dim", "small", wrap=True)
-        away_texts = vbox(2, label(_("Poza domem"), "heading"), self.away_text)
+        away_texts = vbox(2, label(_("Away from home"), "heading"), self.away_text)
         away_texts.set_hexpand(True)
         away_icon = Gtk.Image.new_from_icon_name("network-vpn-symbolic")
         away_icon.set_pixel_size(24)
         row = Gtk.ListBoxRow(activatable=False)
-        row.set_child(hbox(12, away_icon, away_texts, button(_("Jak to działa?"), self.show_vpn_help)))
+        row.set_child(hbox(12, away_icon, away_texts, button(_("How does it work?"), self.show_vpn_help)))
         this_list.append(row)
 
         self.login_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         self.login_switch.connect("state-set", self._login_changed)
-        login_texts = vbox(2, label(_("Po zalogowaniu"), "heading"),
-                           label(_("Uzgadniaj grupę i podłączaj komputery oznaczone „Podłączaj po "
-                                   "zalogowaniu”. Udostępnianie działa także bez tego."),
+        login_texts = vbox(2, label(_("At login"), "heading"),
+                           label(_("Sync the group and connect the computers marked “Connect at "
+                                   "login”. Sharing works without this too."),
                                  "dim", "small", wrap=True))
         login_texts.set_hexpand(True)
         login_icon = Gtk.Image.new_from_icon_name("system-run-symbolic")
@@ -603,20 +606,21 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.peer_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.peer_list.add_css_class("boxed")
-        self.peer_list.set_placeholder(label(_("Jeszcze żadnego. Połącz się z komputerem z listy poniżej."),
+        self.peer_list.set_placeholder(label(_("None yet. Pair with a computer from the list below."),
                                              "dim", "placeholder", wrap=True))
         self.nearby_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.nearby_list.add_css_class("boxed")
         spinner = Gtk.Spinner(spinning=not demo)
-        searching = hbox(10, spinner, label(_("Szukam komputerów z otwartym HomeMesh w tej sieci…"),
+        searching = hbox(10, spinner, label(_("Looking for computers with HomeMesh open on this "
+                                              "network…"),
                                             "dim", wrap=True))
         searching.add_css_class("placeholder")
         self.nearby_list.set_placeholder(searching)
 
         content = vbox(18, self.hint,
-                       vbox(8, label(_("Ten komputer"), "heading"), this_list),
-                       vbox(8, label(_("Połączone komputery"), "heading"), self.peer_list),
-                       vbox(8, label(_("W pobliżu"), "heading"), self.nearby_list),
+                       vbox(8, label(_("This computer"), "heading"), this_list),
+                       vbox(8, label(_("Paired computers"), "heading"), self.peer_list),
+                       vbox(8, label(_("Nearby"), "heading"), self.nearby_list),
                        margin=18)
         scrolled = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
         scrolled.set_child(content)
@@ -650,11 +654,11 @@ class MainWindow(Gtk.ApplicationWindow):
         try:
             self.server = proto.PairServer(self.on_pair_request)
         except OSError as error:
-            self.toast(_("Nie mogę przyjmować połączeń: {error}").format(error=error))
+            self.toast(_("Cannot accept pairing requests: {error}").format(error=error))
         try:
             self.discovery = Discovery(self._discovery_info, on_change=lambda: idle(self.refresh_nearby))
         except OSError as error:
-            self.toast(_("Nie mogę szukać komputerów w sieci: {error}").format(error=error))
+            self.toast(_("Cannot look for computers on the network: {error}").format(error=error))
 
     def _discovery_info(self):
         return {"id": self.st["id"], "name": hostname(), "user": username(),
@@ -703,10 +707,10 @@ class MainWindow(Gtk.ApplicationWindow):
     def _via_text(self, peer):
         via = peer.get("via")
         if via == "direct":
-            return _("połączony bezpośrednio")
+            return _("paired directly")
         introducer = self.st["peers"].get(via)
-        return _("przedstawiony przez {name}").format(name=introducer["name"]) if introducer \
-            else _("przedstawiony przez inny komputer")
+        return _("introduced by {name}").format(name=introducer["name"]) if introducer \
+            else _("introduced by another computer")
 
     def refresh_nearby(self):
         if self.discovery:
@@ -725,19 +729,20 @@ class MainWindow(Gtk.ApplicationWindow):
         name = hostname()
         self.this_name.set_text(name)
         if not self.configured:
-            text = _("Udostępnianie wyłączone. Inne komputery nie mają tu dostępu.")
+            text = _("Sharing is off. Other computers have no access here.")
         elif not self.running:
-            text = _("Udostępnianie włączone, ale serwer SSH nie działa.")
+            text = _("Sharing is on, but the SSH server is not running.")
         else:
-            text = _("Udostępnianie włączone. Inne komputery widzą go jako {name}.local.").format(name=name)
+            text = _("Sharing is on. Other computers see it as {name}.local.").format(name=name)
         self.this_text.set_text(text)
         self.share_text.set_text(share.summary(share.current(self.st)))
         tunnels = self.tunnels
         if tunnels:
-            self.away_text.set_text(_("Dostępny przez {vpn}. Połączone komputery, które też mają VPN, "
-                                      "otworzą ten komputer także spoza domu.").format(vpn=vpn.describe(tunnels)))
+            self.away_text.set_text(_("Reachable through {vpn}. Paired computers that also have a "
+                                      "VPN can open this computer from away too.").format(vpn=vpn.describe(tunnels)))
         else:
-            self.away_text.set_text(_("Tylko w sieci lokalnej. Spoza domu potrzebny jest VPN, np. Tailscale."))
+            self.away_text.set_text(_("Only on the local network. From away you need a VPN such as "
+                                      "Tailscale."))
         self._switch_guard = True
         self.switch.set_active(self.configured)
         self.switch.set_state(self.configured)
@@ -755,43 +760,46 @@ class MainWindow(Gtk.ApplicationWindow):
         peers = self.st["peers"]
         hint = self.hint.set
         if self.helper_busy:
-            hint("step", "content-loading-symbolic", _("Chwileczkę…"),
-                 _("Zmieniam ustawienia. Jeśli pojawi się okno z hasłem administratora, wpisz je."))
+            hint("step", "content-loading-symbolic", _("One moment…"),
+                 _("Changing settings. If a window asks for the administrator password, enter it."))
         elif not self.configured:
-            hint("step", "go-next-symbolic", _("Krok 1 z 3: włącz udostępnianie"),
-                 _("Dzięki temu inne twoje komputery będą mogły otworzyć katalog domowy tego komputera. "
-                   "Komputer zapyta o hasło administratora."), _("Włącz"), self.enable)
+            hint("step", "go-next-symbolic", _("Step 1 of 3: turn sharing on"),
+                 _("This lets your other computers open this computer's home folder. You will be "
+                   "asked for the administrator password."), _("Turn on"), self.enable)
         elif not self.running:
-            hint("problem", "dialog-warning-symbolic", _("Serwer SSH nie działa"),
-                 _("Bez niego inne komputery nie otworzą tego komputera."), _("Napraw"), self.enable)
+            hint("problem", "dialog-warning-symbolic", _("The SSH server is not running"),
+                 _("Without it, other computers cannot open this computer."), _("Fix"), self.enable)
         elif not self.mdns_ok:
-            hint("problem", "dialog-warning-symbolic", _("Inne komputery nie znajdą tego po nazwie"),
-                 _("Brakuje usługi mDNS, która odpowiada na nazwę {name}.local.").format(name=name),
-                 _("Napraw"), self.enable)
+            hint("problem", "dialog-warning-symbolic", _("Other computers cannot find this one by "
+                                                         "name"),
+                 _("The mDNS service that answers to {name}.local is missing.").format(name=name),
+                 _("Fix"), self.enable)
         elif twins:
-            hint("problem", "dialog-warning-symbolic", _("Dwa komputery nazywają się „{name}”").format(name=name),
-                 _("Komputery w sieci muszą mieć różne nazwy. Nadaj temu komputerowi inną."),
-                 _("Zmień nazwę"), self.ask_rename)
+            hint("problem", "dialog-warning-symbolic", _("Two computers are called “{name}”").format(name=name),
+                 _("Computers on a network need different names. Give this one another name."),
+                 _("Rename"), self.ask_rename)
         elif not peers and any(e["ready"] for e in waiting):
-            hint("step", "go-next-symbolic", _("Krok 3 z 3: połącz komputery"),
-                 _("Kliknij „Połącz” przy nazwie komputera poniżej i porównaj kody na obu ekranach."))
+            hint("step", "go-next-symbolic", _("Step 3 of 3: pair the computers"),
+                 _("Click “Connect” next to a computer below and compare the codes on both screens."))
         elif not peers and waiting:
-            hint("step", "go-next-symbolic", _("Krok 2 z 3: włącz udostępnianie na drugim komputerze"),
-                 _("Na komputerze {name} kliknij „Włącz” w HomeMesh.").format(name=waiting[0]["name"]))
+            hint("step", "go-next-symbolic", _("Step 2 of 3: enable sharing on the other computer"),
+                 _("On {name}, click “Turn on” in HomeMesh.").format(name=waiting[0]["name"]))
         elif not peers:
-            hint("step", "go-next-symbolic", _("Krok 2 z 3: otwórz HomeMesh na drugim komputerze"),
-                 _("Zainstaluj i uruchom HomeMesh na innym komputerze w tej samej sieci. "
-                   "Pojawi się poniżej, w sekcji „W pobliżu”."))
+            hint("step", "go-next-symbolic", _("Step 2 of 3: open HomeMesh on the other computer"),
+                 _("Install and start HomeMesh on another computer on the same network. It will "
+                   "appear below, under “Nearby”."))
         elif not self.gvfs and not system.kde():
-            hint("problem", "dialog-warning-symbolic", _("Menedżer plików nie otworzy połączonych komputerów"),
-                 _("Zainstaluj pakiet gvfs (dla Nautilusa, Nemo, Thunara i Caja), potem uruchom ponownie sesję."))
+            hint("problem", "dialog-warning-symbolic", _("Your file manager cannot open the paired "
+                                                         "computers"),
+                 _("Install the gvfs package (for Nautilus, Nemo, Thunar and Caja), then log out "
+                   "and back in."))
         elif any(e["ready"] for e in waiting):
-            hint("step", "list-add-symbolic", _("W pobliżu jest kolejny komputer"),
-                 _("Kliknij „Połącz”, żeby dołączyć {name} do grupy.").format(name=waiting[0]["name"]))
+            hint("step", "list-add-symbolic", _("Another computer is nearby"),
+                 _("Click “Connect” to add {name} to the group.").format(name=waiting[0]["name"]))
         else:
-            hint("done", "emblem-ok-symbolic", _("Gotowe"),
-                 _("Połączone komputery są w panelu bocznym menedżera plików. Nowy komputer wystarczy "
-                   "połączyć z dowolnym z nich: pozostałe dowiedzą się o nim same."))
+            hint("done", "emblem-ok-symbolic", _("All set"),
+                 _("Paired computers are in your file manager's sidebar. A new computer only needs "
+                   "pairing with one of them: the others learn about it by themselves."))
 
     # ------------------------------------------------------------- checks
 
@@ -837,7 +845,7 @@ class MainWindow(Gtk.ApplicationWindow):
     def sync_now(self, quiet=False):
         if self.syncing or not self.st["peers"]:
             if not quiet:
-                self.toast(_("Brak połączonych komputerów.") if not self.st["peers"] else _("Już uzgadniam…"))
+                self.toast(_("No paired computers.") if not self.st["peers"] else _("Already syncing…"))
             return
         self.syncing = True
 
@@ -851,7 +859,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.refresh_state()
         if not quiet:
             reached = sum(1 for error in report.values() if error is None)
-            self.toast(_("Uzgodniono z {n} z {total} komputerów.").format(n=reached, total=len(report)))
+            self.toast(_("Synced with {n} of {total} computers.").format(n=reached, total=len(report)))
 
     def toast(self, text):
         self.toaster.show(text)
@@ -864,14 +872,14 @@ class MainWindow(Gtk.ApplicationWindow):
         if wanted:
             self.enable()
         else:
-            confirm(self, _("Wyłączyć udostępnianie?"),
-                    _("Połączone komputery stracą dostęp do tego komputera. Grupa zostaje: po ponownym "
-                      "włączeniu wszystko zadziała jak wcześniej."),
-                    _("Wyłącz"), lambda: self.run_helper(["disable"], _("Udostępnianie wyłączone.")))
+            confirm(self, _("Turn sharing off?"),
+                    _("Paired computers lose access to this computer. The group stays: turn "
+                      "sharing back on and everything works as before."),
+                    _("Turn off"), lambda: self.run_helper(["disable"], _("Sharing is off.")))
         return True  # the switch follows the real state once the helper is done
 
     def enable(self):
-        self.run_helper(["enable"], _("Udostępnianie włączone."))
+        self.run_helper(["enable"], _("Sharing is on."))
 
     def _login_changed(self, switch, wanted):
         if self._switch_guard:
@@ -896,9 +904,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.refresh_state()
         stopped = share.end_connections()
         if stopped:
-            self.toast(_("Zapisano. Inne komputery muszą otworzyć ten komputer ponownie."))
+            self.toast(_("Saved. Other computers have to open this computer again."))
         else:
-            self.toast(_("Zapisano."))
+            self.toast(_("Saved."))
 
     def run_helper(self, args, done_text):
         if self.helper_busy:
@@ -917,9 +925,9 @@ class MainWindow(Gtk.ApplicationWindow):
         if result.ok:
             self.toast(done_text)
         elif result.steps:
-            StepsDialog(self, result, _("Nie wszystko się udało")).present()
+            StepsDialog(self, result, _("Not everything worked")).present()
         else:
-            self.toast(result.error or _("Nie udało się."))
+            self.toast(result.error or _("That did not work."))
         self.check_system()
         self.update_this()
         self.update_hint()
@@ -929,12 +937,12 @@ class MainWindow(Gtk.ApplicationWindow):
     def ask_rename(self):
         suggestion = hostname()
         RenameDialog(self, suggestion, lambda name: self.run_helper(
-            ["set-hostname", name], _("Nowa nazwa: {name}.local").format(name=name))).present()
+            ["set-hostname", name], _("New name: {name}.local").format(name=name))).present()
 
     def start_pairing(self, entry):
         with self.pair_lock:
             if self.session:
-                self.toast(_("Trwa już łączenie z innym komputerem."))
+                self.toast(_("Already pairing with another computer."))
                 return
             ui = SessionUI(self)
             session = Session(ui)
@@ -985,7 +993,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if not peer:
             return
         uri = render.peer_uri(peer, render.aliases(self.st)[pid])
-        self.toast(_("Otwieram {name}…").format(name=peer["name"]))
+        self.toast(_("Opening {name}…").format(name=peer["name"]))
         if not self.gvfs:
             self._show_folder(uri)  # Dolphin and other KIO file managers mount by themselves
             return
@@ -999,7 +1007,7 @@ class MainWindow(Gtk.ApplicationWindow):
             gfile.mount_enclosing_volume_finish(result)
         except GLib.Error as error:
             if not error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.ALREADY_MOUNTED):
-                self.toast(_("Nie udało się otworzyć {name}: {error}").format(name=peer["name"],
+                self.toast(_("Could not open {name}: {error}").format(name=peer["name"],
                                                                                error=error.message))
                 return
         self._show_folder(uri)
@@ -1045,15 +1053,15 @@ class MainWindow(Gtk.ApplicationWindow):
             if not app or not app.launch_uris([uri], self.get_display().get_app_launch_context()):
                 raise GLib.Error("no file manager")
         except GLib.Error:
-            self.toast(_("Nie umiem otworzyć {uri}. Zainstaluj gvfs.").format(uri=uri))
+            self.toast(_("Cannot open {uri}. Install gvfs.").format(uri=uri))
 
     def set_automount(self, pid, on):
         with state.transaction() as st:
             if pid in st["peers"]:
                 st["peers"][pid]["automount"] = on
         name = self.st["peers"].get(pid, {}).get("name", "?")
-        text = _("{name} będzie podłączany po zalogowaniu.") if on \
-            else _("{name} nie będzie podłączany po zalogowaniu.")
+        text = _("{name} will be connected at login.") if on \
+            else _("{name} will not be connected at login.")
         self.toast(text.format(name=name))
 
     def ask_remove(self, pid):
@@ -1066,12 +1074,12 @@ class MainWindow(Gtk.ApplicationWindow):
                 state.remove_peer(st, pid)
                 render.apply(st)
             self.refresh_state()
-            self.toast(_("Usunięto {name} z grupy.").format(name=peer["name"]))
+            self.toast(_("Removed {name} from the group.").format(name=peer["name"]))
             self.sync_now(quiet=True)
-        confirm(self, _("Usunąć {name} z grupy?").format(name=peer["name"]),
-                _("Komputer {name} straci dostęp do tego komputera, a pozostałe komputery w grupie "
-                  "dowiedzą się o tym przy najbliższym uzgadnianiu.").format(name=peer["name"]),
-                _("Usuń"), remove)
+        confirm(self, _("Remove {name} from the group?").format(name=peer["name"]),
+                _("{name} loses access to this computer, and the other computers in the group "
+                  "learn about it the next time they sync.").format(name=peer["name"]),
+                _("Remove"), remove)
 
     # --------------------------------------------------------------- demo
 
@@ -1080,17 +1088,18 @@ class MainWindow(Gtk.ApplicationWindow):
         key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI" + "A" * 43
         now = time.time()
         peers = {}
+        user, workshop, old = demo_names()[:3]
         for number, (name, via, online) in enumerate((("laptop", "direct", True),
-                                                      ("pracownia", "1" * 32, False))):
+                                                      (workshop, "1" * 32, False))):
             pid = str(number + 1) * 32
-            peers[pid] = {"id": pid, "name": name, "user": "ania", "home": "/home/ania", "userkey": key,
+            peers[pid] = {"id": pid, "name": name, "user": user, "home": f"/home/{user}", "userkey": key,
                           "hostkey": key, "port": 22, "updated": now, "via": via, "added": now}
             self.online[pid] = "lan" if online else None
         self.st = state.new_state()
         self.st["peers"] = peers
         self.configured = self.running = True
         self.tunnels = [{"addr": "100.101.102.103", "kind": "Tailscale"}]
-        self.nearby = [{"id": "9" * 32, "name": "stary-pc", "user": "ania", "port": 41753,
+        self.nearby = [{"id": "9" * 32, "name": old, "user": user, "port": 41753,
                         "ready": True, "ip": "192.168.1.23", "seen": 0}]
         self.rebuild_peers()
         self.nearby_list.remove_all()
@@ -1098,6 +1107,13 @@ class MainWindow(Gtk.ApplicationWindow):
             self.nearby_list.append(NearbyRow(self, entry, True))
         self.update_this()
         self.update_hint()
+
+
+def demo_names():
+    """Made-up user, computers and folders for screenshots, in the interface's language."""
+    if _("Sharing") == "Udostępnianie":
+        return "ania", "pracownia", "stary-pc", "Publiczny", "Muzyka"
+    return "anna", "workshop", "old-pc", "Public", "Music"
 
 
 def save_screenshot(widget, path):
@@ -1158,9 +1174,10 @@ class App(Gtk.Application):
             GLib.timeout_add(800, lambda: (save_screenshot(dialog.get_child(), path), self.quit(), False)[2])
             return False
         if self.options.get("share"):
+            user, _workshop, _old, public, music = demo_names()
             dialog = ShareDialog(self.window, {"mode": "folders", "folders": [
-                {"path": "/home/ania/Publiczny", "readonly": False},
-                {"path": "/home/ania/Muzyka", "readonly": True}]}, lambda new: None)
+                {"path": f"/home/{user}/{public}", "readonly": False},
+                {"path": f"/home/{user}/{music}", "readonly": True}]}, lambda new: None)
             dialog.present()
             GLib.timeout_add(800, lambda: (save_screenshot(dialog.get_child(), path), self.quit(), False)[2])
             return False
@@ -1178,7 +1195,7 @@ class App(Gtk.Application):
     def about(self):
         Gtk.AboutDialog(transient_for=self.window, modal=True, program_name=APP_NAME,
                         logo_icon_name=APP_ID, version=__version__,
-                        comments=_("Katalogi domowe twoich komputerów w menedżerze plików."),
+                        comments=_("The home folders of your computers in your file manager."),
                         license_type=Gtk.License.MIT_X11,
                         website="https://github.com/MikolajQ/homemesh").present()
 

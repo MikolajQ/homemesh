@@ -146,24 +146,24 @@ def gate():
         if share["mode"] == "home":
             os.execv(server, [server])
         if not shutil.which("bwrap"):
-            sys.stderr.write(_("HomeMesh: brak pakietu bubblewrap, więc nic nie jest udostępniane.\n"))
+            sys.stderr.write(_("HomeMesh: the bubblewrap package is missing, so nothing is shared.\n"))
             return 1
         files = {path: _pipe_with(text) for path, text in account_files().items()}
         command = sandbox_command(share, paths.home(), server, files)
         os.execvp(command[0], command)
-    sys.stderr.write(_("HomeMesh: ten komputer udostępnia tylko wybrane foldery, przez SFTP.\n"))
+    sys.stderr.write(_("HomeMesh: this computer shares only chosen folders, over SFTP.\n"))
     return 1
 
 
 def summary(share):
     if share["mode"] == "home":
-        return _("Cały katalog domowy")
+        return _("The whole home folder")
     if not share["folders"]:
-        return _("Nic (żaden folder nie jest wybrany)")
+        return _("Nothing (no folder chosen)")
     parts = []
     for folder in share["folders"]:
         name = Path(folder["path"]).name or folder["path"]
-        parts.append(f"{name} ({_('tylko odczyt') if folder['readonly'] else _('odczyt i zapis')})")
+        parts.append(f"{name} ({_("read-only") if folder['readonly'] else _("read-write")})")
     return ", ".join(parts)
 
 

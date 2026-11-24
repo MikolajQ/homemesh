@@ -12,8 +12,8 @@ No Samba, no NFS, no server to run: underneath is plain SSH/SFTP, which every
 Linux computer already has.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
-  <img alt="The HomeMesh window: this computer with its sharing switch, what other computers see, access from away and login tasks; paired computers with their status; a computer nearby ready to pair" src="docs/screenshots/overview-light.png" width="544">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/overview-dark.png">
+  <img alt="The HomeMesh window: this computer with its sharing switch, what other computers see, access from away and login tasks; paired computers with their status; a computer nearby ready to pair" src="docs/screenshots/en/overview-light.png" width="544">
 </picture>
 
 ## At a glance
@@ -38,15 +38,15 @@ Linux computer already has.
 **Pairing**: both computers show the same code.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pair-dark.png">
-  <img alt="Pairing window with the code 482 913 and buttons Does not match and Matches" src="docs/screenshots/pair-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/pair-dark.png">
+  <img alt="Pairing window with the code 482 913 and buttons Does not match and Matches" src="docs/screenshots/en/pair-light.png">
 </picture>
 
 **What other computers see**: everything, or chosen folders.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/share-dark.png">
-  <img alt="Sharing window: whole home folder or only chosen folders, with Public read-write and Music read-only" src="docs/screenshots/share-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/share-dark.png">
+  <img alt="Sharing window: whole home folder or only chosen folders, with Public read-write and Music read-only" src="docs/screenshots/en/share-light.png">
 </picture>
 
 </td>
@@ -55,21 +55,22 @@ Linux computer already has.
 **Away from home**: how to add a VPN.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/away-dark.png">
-  <img alt="Help window explaining access from away with Tailscale" src="docs/screenshots/away-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/away-dark.png">
+  <img alt="Help window explaining access from away with Tailscale" src="docs/screenshots/en/away-light.png">
 </picture>
 
 </td>
 </tr>
 </table>
 
-The interface is in Polish for now; an English translation is next.
+The interface speaks English and Polish; [translations](#translations) are welcome.
 
 ## Install
 
-From the AUR:
+From the AUR, the latest release or the development version:
 
-    paru -S homemesh-git      # or: yay -S homemesh-git
+    paru -S homemesh          # or: yay -S homemesh
+    paru -S homemesh-git
 
 From a checkout:
 
@@ -197,7 +198,7 @@ the group and mounts the computers marked *Connect at login*, then exits.
 
 ## Status
 
-Version 0.1: young. It has been tried between two Arch-based computers, one
+Version 0.2: young. It has been tried between two Arch-based computers, one
 with GNOME and one with KDE Plasma; Dolphin's side and the systems without
 systemd (OpenRC, runit, s6, dinit) are written but not yet tried for real.
 Reports are welcome.
@@ -205,13 +206,21 @@ Reports are welcome.
 ## Uninstall
 
     homemesh reset && homemesh disable
-    sudo pacman -R homemesh-git
+    sudo pacman -R homemesh      # or homemesh-git
 
 ## Development
 
-    make test                            # 44 tests; the integration tests run private sshd instances
+    make test                            # 47 tests; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
+
+## Translations
+
+Messages are in English in the code and translated with gettext; Polish is
+in `po/pl.po`. To add a language: `make pot`, copy `po/homemesh.pot` to
+`po/<language>.po`, translate it (keep the `{fields}`), then `make mo` and
+run with `LANGUAGE=<language> bin/homemesh`. `make test` checks that every
+message is translated and keeps its fields.
 
 ## Writing about HomeMesh
 

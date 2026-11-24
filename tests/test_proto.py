@@ -100,7 +100,7 @@ class PairingTest(unittest.TestCase):
             chan.recv()
             proto.refuse(chan, "not-ready")
         threading.Thread(target=answer).start()
-        with self.assertRaisesRegex(PairingError, "wyłączone"):
+        with self.assertRaisesRegex(PairingError, "Sharing is off"):
             proto.initiate(Channel(a), offer("a", "alfa"))
         a.close()
         b.close()

@@ -21,7 +21,7 @@ def has_display():
 def print_result(result, ok_text):
     for step in result.steps:
         mark = "✓" if step.get("ok") else "✗"
-        print(f"  {mark} {step.get('msg', '')}")
+        print(f"  {mark} {system.step_text(step)}")
     if result.error:
         print(f"  ✗ {result.error}")
     if result.ok:
@@ -39,57 +39,57 @@ def own_info(tcp_port=None):
 def via_text(st, peer):
     via = peer.get("via")
     if via == "direct":
-        return _("połączony bezpośrednio")
+        return _("paired directly")
     introducer = st["peers"].get(via)
     if introducer:
-        return _("przedstawiony przez {name}").format(name=introducer["name"])
-    return _("przedstawiony przez inny komputer")
+        return _("introduced by {name}").format(name=introducer["name"])
+    return _("introduced by another computer")
 
 
 def cmd_status(args):
     with state.transaction() as st:
         card = state.own_card(st)
-    print(_("Ten komputer: {name}  (inne komputery widzą go jako {name}.local)").format(name=card["name"]))
+    print(_("This computer: {name}  (other computers see it as {name}.local)").format(name=card["name"]))
     if not system.sharing_configured():
-        print(_("Udostępnianie: wyłączone. Włącz: homemesh enable"))
+        print(_("Sharing: off. Turn on: homemesh enable"))
     elif not system.sshd_running():
-        print(_("Udostępnianie: włączone, ale serwer SSH nie działa. Napraw: homemesh enable"))
+        print(_("Sharing: on, but the SSH server is not running. Fix: homemesh enable"))
     else:
-        print(_("Udostępnianie: włączone"))
+        print(_("Sharing: on"))
     works, how = system.mdns()
-    print(_("Nazwy .local: działają ({how})").format(how=how) if works
-          else _("Nazwy .local: nie działają. Napraw: homemesh enable"))
-    print(_("Udostępniane: {what}").format(what=share.summary(share.current(st))))
+    print(_(".local names: working ({how})").format(how=how) if works
+          else _(".local names: not working. Fix: homemesh enable"))
+    print(_("Shared: {what}").format(what=share.summary(share.current(st))))
     tunnels = card.get("vpn")
-    print(_("Poza domem: przez {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
-          else _("Poza domem: niedostępny (potrzebny VPN, np. Tailscale)"))
-    print(_("Po zalogowaniu: uzgadnia grupę i podłącza wybrane komputery") if st.get("login", True)
-          else _("Po zalogowaniu: nic (homemesh autostart on włącza)"))
+    print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
+          else _("Away from home: not reachable (needs a VPN such as Tailscale)"))
+    print(_("At login: syncs the group and connects the chosen computers") if st.get("login", True)
+          else _("At login: nothing (turn on: homemesh autostart on)"))
     peers = st["peers"]
     if not peers:
-        print(_("Połączone komputery: brak. Połącz: homemesh pair"))
+        print(_("Paired computers: none. Pair: homemesh pair"))
         return 0
-    print(_("Połączone komputery:"))
+    print(_("Paired computers:"))
     online = system.reachable(peers)
     names = render.aliases(st)
     for pid, peer in sorted(peers.items(), key=lambda kv: kv[1]["name"]):
-        status = {"lan": _("w sieci lokalnej"), "vpn": _("przez VPN")}.get(online.get(pid), _("niedostępny"))
+        status = {"lan": _("on the local network"), "vpn": _("through VPN")}.get(online.get(pid), _("not reachable"))
         print(f"  {peer['name']:<16} {peer['user']}@{names[pid]:<24} {status:<12} {via_text(st, peer)}")
     return 0
 
 
 def cmd_enable(args):
     return print_result(system.run_helper(["enable"], terminal=True),
-                        _("Udostępnianie włączone. Teraz połącz komputery: homemesh pair"))
+                        _("Sharing is on. Now pair your computers: homemesh pair"))
 
 
 def cmd_disable(args):
-    return print_result(system.run_helper(["disable"], terminal=True), _("Udostępnianie wyłączone."))
+    return print_result(system.run_helper(["disable"], terminal=True), _("Sharing is off."))
 
 
 def cmd_rename(args):
     code = print_result(system.run_helper(["set-hostname", args.name], terminal=True),
-                        _("Nowa nazwa: {name}.local").format(name=args.name))
+                        _("New name: {name}.local").format(name=args.name))
     if code == 0:
         sync.sync_all()
     return code
@@ -108,20 +108,21 @@ class TerminalUI:
 
     def code(self, card, code):
         print()
-        print(_("  Kod:  {code}").format(code=code))
+        print(_("  Code:  {code}").format(code=code))
         print()
-        print(_("Sprawdź, czy na komputerze {name} widać ten sam kod.").format(name=card["name"]))
-        print(_("Połączone komputery mają pełny dostęp do swoich katalogów domowych: łącz tylko własne."))
-        ok = os.environ.get("HOMEMESH_TEST_AUTOCONFIRM") == "1" or ask_yes(_("Zgadza się? [t/N] "))
+        print(_("Check that {name} shows the same code.").format(name=card["name"]))
+        print(_("Paired computers have full access to each other's home folders: pair only your "
+                "own."))
+        ok = os.environ.get("HOMEMESH_TEST_AUTOCONFIRM") == "1" or ask_yes(_("Does it match? [y/N] "))
         self.session.decide(ok)
         if ok:
-            print(_("Czekam na potwierdzenie na komputerze {name}…").format(name=card["name"]))
+            print(_("Waiting for confirmation on {name}…").format(name=card["name"]))
 
     def remote_confirmed(self):
         pass
 
     def paired(self, card):
-        print(_("✓ Połączono z {name}.").format(name=card["name"]))
+        print(_("✓ Paired with {name}.").format(name=card["name"]))
 
     def failed(self, message):
         print(f"✗ {message}")
@@ -131,7 +132,7 @@ def discover(seconds, tcp_port=None):
     try:
         found = Discovery(lambda: own_info(tcp_port))
     except OSError as error:
-        print(_("Nie mogę nasłuchiwać w sieci ({error}).").format(error=error))
+        print(_("Cannot listen on the network ({error}).").format(error=error))
         return None, []
     time.sleep(seconds)
     return found, found.nearby()
@@ -147,20 +148,20 @@ def pick_target(args):
         if host and port.isdigit():
             return host, int(port)
         return args.target, PORT
-    print(_("Szukam komputerów z otwartym HomeMesh…"))
+    print(_("Looking for computers with HomeMesh open…"))
     _disc, nearby = discover(4)
     with state.transaction() as st:
         known = set(st["peers"])
     nearby = [entry for entry in nearby if entry["id"] not in known]
     if not nearby:
-        print(_("Nie widzę żadnego. Otwórz HomeMesh na drugim komputerze (albo uruchom tam "
-                "„homemesh pair --wait”) i spróbuj ponownie."))
+        print(_("None found. Open HomeMesh on the other computer (or run “homemesh pair --wait” "
+                "there) and try again."))
         return None
     for number, entry in enumerate(nearby, 1):
-        note = "" if entry["ready"] else _("  (udostępnianie wyłączone)")
+        note = "" if entry["ready"] else _("  (sharing is off)")
         print(f"  {number}. {entry['name']}  ({entry['user']}, {entry['ip']}){note}")
     try:
-        choice = int(input(_("Numer komputera: ")))
+        choice = int(input(_("Computer number: ")))
         entry = nearby[choice - 1]
     except (ValueError, IndexError, EOFError):
         return None
@@ -169,7 +170,7 @@ def pick_target(args):
 
 def cmd_pair(args):
     if not system.ready():
-        print(_("Udostępnianie na tym komputerze jest wyłączone. Najpierw: homemesh enable"))
+        print(_("Sharing is off on this computer. First: homemesh enable"))
         return 1
     ui = TerminalUI()
     session = Session(ui)
@@ -197,8 +198,8 @@ def cmd_pair(args):
             Discovery(lambda: own_info(server.port))
         except OSError:
             pass
-        print(_("Czekam na połączenie (port {port}). Na drugim komputerze kliknij „Połącz” przy nazwie "
-                "{name}. Ctrl+C przerywa.").format(port=server.port, name=own_info()["name"]))
+        print(_("Waiting to be paired (port {port}). On the other computer, click “Connect” next "
+                "to {name}. Ctrl+C stops.").format(port=server.port, name=own_info()["name"]))
         try:
             while not finished.wait(0.5):
                 pass
@@ -213,7 +214,7 @@ def cmd_pair(args):
         ok = session.ask(*target)
     if not ok:
         return 1
-    print(_("Uzgadniam grupę z pozostałymi komputerami…"))
+    print(_("Catching up with the rest of the group…"))
     sync.sync_all()
     return cmd_status(args)
 
@@ -222,11 +223,11 @@ def cmd_remove(args):
     with state.transaction() as st:
         pid, peer = state.find_peer(st, args.name)
         if not pid:
-            print(_("Nie znam komputera „{name}”.").format(name=args.name))
+            print(_("No computer called “{name}”.").format(name=args.name))
             return 1
         state.remove_peer(st, pid)
         render.apply(st)
-    print(_("Usunięto {name}. Pozostałe komputery dowiedzą się o tym przy najbliższym uzgadnianiu.")
+    print(_("Removed {name}. The other computers will learn about it the next time they sync.")
           .format(name=peer["name"]))
     sync.sync_all()
     return 0
@@ -289,7 +290,8 @@ def cmd_login(args):
 
 
 def cmd_reset(args):
-    if not args.yes and not ask_yes(_("Usunąć ten komputer z grupy i wszystkie ustawienia HomeMesh? [t/N] ")):
+    if not args.yes and not ask_yes(_("Remove this computer from the group and all HomeMesh "
+                                      "settings? [y/N] ")):
         return 1
     with state.transaction() as st:
         # A tombstone for ourselves tells the others to drop us.
@@ -299,7 +301,7 @@ def cmd_reset(args):
         st["peers"], st["removed"] = {}, {}
         render.apply(st)
     shutil.rmtree(paths.config_dir(), ignore_errors=True)
-    print(_("Gotowe. Udostępnianie wyłączysz poleceniem: homemesh disable"))
+    print(_("Done. To turn sharing off as well: homemesh disable"))
     return 0
 
 
@@ -307,11 +309,11 @@ def save_share(new, stop_sessions=True):
     with state.transaction() as st:
         st["share"] = new
         render.apply(st)
-    print(_("Udostępniane: {what}").format(what=share.summary(new)))
+    print(_("Shared: {what}").format(what=share.summary(new)))
     if stop_sessions:
         stopped = share.end_connections()
         if stopped:
-            print(_("Zakończono bieżące połączenia ({n}); inne komputery muszą otworzyć folder ponownie.")
+            print(_("Ended {n} running connections; other computers have to open the folder again.")
                   .format(n=stopped))
 
 
@@ -319,22 +321,22 @@ def cmd_share(args):
     with state.transaction() as st:
         now = share.current(st)
     if args.action is None:
-        print(_("Udostępniane: {what}").format(what=share.summary(now)))
+        print(_("Shared: {what}").format(what=share.summary(now)))
         return 0
     if args.action == "home":
         save_share({"mode": "home", "folders": now["folders"]})
         return 0
     if not args.path:
-        print(_("Podaj folder."))
+        print(_("Name a folder."))
         return 1
     path = os.path.realpath(os.path.expanduser(args.path))
     folders = [f for f in now["folders"] if f["path"] != path]
     if args.action == "add":
         if not os.path.isdir(path):
-            print(_("Nie ma takiego folderu: {path}").format(path=path))
+            print(_("No such folder: {path}").format(path=path))
             return 1
         if not share.sandbox_available():
-            print(_("Do udostępniania wybranych folderów potrzebny jest pakiet bubblewrap."))
+            print(_("Sharing chosen folders needs the bubblewrap package."))
             return 1
         folders.append({"path": path, "readonly": args.readonly})
     save_share({"mode": "folders", "folders": folders})
@@ -347,8 +349,8 @@ def cmd_autostart(args):
             st["login"] = args.state == "on"
             render.apply(st)
         on = st.get("login", True)
-    print(_("Po zalogowaniu: uzgadnia grupę i podłącza wybrane komputery") if on
-          else _("Po zalogowaniu: nic"))
+    print(_("At login: syncs the group and connects the chosen computers") if on
+          else _("At login: nothing"))
     return 0
 
 
@@ -361,34 +363,36 @@ def cmd_apply(args):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="homemesh",
-        description=_("{app}: katalogi domowe twoich komputerów w menedżerze plików. "
-                      "Bez argumentów otwiera okno.").format(app=APP_NAME))
+        description=_("{app}: the home folders of your computers in your file manager. Without "
+                      "arguments it opens the window.").format(app=APP_NAME))
     parser.add_argument("--version", action="version", version=f"homemesh {__version__}")
-    sub = parser.add_subparsers(dest="command", metavar=_("POLECENIE"))
-    sub.add_parser("status", help=_("stan tego komputera i grupy")).set_defaults(func=cmd_status)
-    sub.add_parser("enable", help=_("włącz udostępnianie (pyta o hasło administratora)")).set_defaults(func=cmd_enable)
-    sub.add_parser("disable", help=_("wyłącz udostępnianie")).set_defaults(func=cmd_disable)
-    pair = sub.add_parser("pair", help=_("połącz z innym komputerem (kodem)"))
-    pair.add_argument("target", nargs="?", help=_("nazwa albo adres[:port] drugiego komputera"))
-    pair.add_argument("--wait", action="store_true", help=_("czekaj, aż drugi komputer zacznie"))
+    sub = parser.add_subparsers(dest="command", metavar=_("COMMAND"))
+    sub.add_parser("status", help=_("the state of this computer and the group")).set_defaults(func=cmd_status)
+    sub.add_parser("enable", help=_("turn sharing on (asks for the administrator password)")).set_defaults(func=cmd_enable)
+    sub.add_parser("disable", help=_("turn sharing off")).set_defaults(func=cmd_disable)
+    pair = sub.add_parser("pair", help=_("pair with another computer (with a code)"))
+    pair.add_argument("target", nargs="?", help=_("the other computer's name or address[:port]"))
+    pair.add_argument("--wait", action="store_true", help=_("wait for the other computer to start"))
     pair.set_defaults(func=cmd_pair)
-    remove = sub.add_parser("remove", help=_("usuń komputer z grupy"))
+    remove = sub.add_parser("remove", help=_("remove a computer from the group"))
     remove.add_argument("name")
     remove.set_defaults(func=cmd_remove)
-    sub.add_parser("sync", help=_("uzgodnij grupę z dostępnymi komputerami")).set_defaults(func=cmd_sync)
-    rename = sub.add_parser("rename", help=_("zmień nazwę tego komputera w sieci"))
+    sub.add_parser("sync", help=_("sync the group with the reachable computers")).set_defaults(func=cmd_sync)
+    rename = sub.add_parser("rename", help=_("rename this computer on the network"))
     rename.add_argument("name")
     rename.set_defaults(func=cmd_rename)
-    shared = sub.add_parser("share", help=_("co widzą inne komputery: cały katalog domowy albo wybrane foldery"))
+    shared = sub.add_parser("share", help=_("what other computers see: the whole home folder or "
+                                            "chosen folders"))
     shared.add_argument("action", nargs="?", choices=("home", "add", "remove"),
-                        help=_("home: cały katalog domowy; add/remove: wybrane foldery"))
+                        help=_("home: the whole home folder; add/remove: chosen folders"))
     shared.add_argument("path", nargs="?")
-    shared.add_argument("--readonly", action="store_true", help=_("folder tylko do odczytu"))
+    shared.add_argument("--readonly", action="store_true", help=_("read-only folder"))
     shared.set_defaults(func=cmd_share)
-    autostart = sub.add_parser("autostart", help=_("uzgadnianie grupy i podłączanie po zalogowaniu"))
+    autostart = sub.add_parser("autostart", help=_("syncing the group and connecting computers at "
+                                                   "login"))
     autostart.add_argument("state", nargs="?", choices=("on", "off"))
     autostart.set_defaults(func=cmd_autostart)
-    reset = sub.add_parser("reset", help=_("opuść grupę i usuń ustawienia HomeMesh"))
+    reset = sub.add_parser("reset", help=_("leave the group and remove HomeMesh's settings"))
     reset.add_argument("--yes", action="store_true")
     reset.set_defaults(func=cmd_reset)
     for hidden, func in (("login", cmd_login), ("sync-serve", lambda a: sync.serve()),

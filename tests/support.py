@@ -10,6 +10,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+# Messages in English whatever the system language (also for the child processes).
+os.environ["LANGUAGE"] = "en"
 
 KEY_PREFIX = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI"
 
