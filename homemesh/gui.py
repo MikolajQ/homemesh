@@ -910,7 +910,7 @@ class MainWindow(Gtk.ApplicationWindow):
         elif not self.mdns_ok:
             hint("problem", "dialog-warning-symbolic", _("Other computers cannot find this one by "
                                                          "name"),
-                 _("The mDNS service that answers to {name}.local is missing.").format(name=name),
+                 _("mDNS, which answers to {name}.local, is missing or turned off.").format(name=name),
                  _("Fix"), self.enable)
         elif twins:
             hint("problem", "dialog-warning-symbolic", _("Two computers are called “{name}”").format(name=name),

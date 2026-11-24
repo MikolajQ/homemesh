@@ -24,7 +24,8 @@ echo "systemctl $*" >> "$LOG"
 case "$1" in
   cat) case "$2" in sshd.service|systemd-resolved.service) exit 0;; esac
        [ -e "$HOMEMESH_HELPER_ROOT/usr/lib/systemd/system/$2" ] || [ -e "$HOMEMESH_HELPER_ROOT/etc/systemd/system/$2" ];;
-  is-enabled) [ -e "$STATE_DIR/enabled-$2" ] && echo enabled || echo disabled;;
+  is-enabled) if [ -e "$STATE_DIR/masked-$2" ]; then echo masked
+              elif [ -e "$STATE_DIR/enabled-$2" ]; then echo enabled; else echo disabled; fi;;
   is-active) case "$3" in systemd-resolved.service) exit 0;; *) [ -e "$STATE_DIR/running-$3" ];; esac;;
   enable) touch "$STATE_DIR/enabled-$2";;
   disable) rm -f "$STATE_DIR/enabled-$2";;
@@ -42,6 +43,19 @@ echo "$(basename "$0") $*" >> "$LOG"
 """
 RESOLVECTL = """#!/bin/sh
 printf 'Global: yes\\nLink 2 (eth0): yes\\n'
+"""
+# systemd-resolved as it reads its files: in the order of names, the last MulticastDNS= counts.
+RESOLVED_CONFIG = """#!/bin/sh
+export LC_ALL=C
+cd "$HOMEMESH_HELPER_ROOT"
+for file in etc/systemd/resolved.conf.d/*.conf; do
+  [ -e "$file" ] && { echo "# /$file"; cat "$file"; echo; }
+done
+"""
+RESOLVECTL_FROM_FILES = """#!/bin/sh
+value=$(systemd-analyze cat-config systemd/resolved.conf | sed -n 's/^MulticastDNS=//p' | tail -n 1)
+[ -e "$STATE_DIR/port-5353-taken" ] && value=no
+printf 'Global: %s\\nLink 2 (eth0): %s\\n' "${value:-no}" "${value:-no}"
 """
 # Answers once some init system has started tailscaled.
 TAILSCALE = """#!/bin/sh
@@ -175,6 +189,106 @@ class HelperTest(unittest.TestCase):
         done = subprocess.run(["python3", str(HELPER), "enable"], capture_output=True, text=True,
                               env={"PATH": "/usr/bin"})
         self.assertEqual(done.returncode, 2)
+
+
+class MdnsTest(HelperTest):
+    """name.local when systemd-resolved has mDNS off at first."""
+
+    def setUp(self):
+        super().setUp()
+        self.tool("systemd-analyze", RESOLVED_CONFIG)
+        self.tool("resolvectl", RESOLVECTL_FROM_FILES)
+        self.tool("nmcli", LOGGER)
+        self.resolved = self.root / "etc/systemd/resolved.conf.d"
+        self.resolved.mkdir(parents=True)
+        self.nm = self.root / "etc/NetworkManager/conf.d"
+        (self.root / "etc/nsswitch.conf").write_text("hosts: files resolve [!UNAVAIL=return] dns\n")
+
+    def off_in(self, name):
+        (self.resolved / name).write_text("[Resolve]\nDNS=127.0.0.1\nMulticastDNS=no\n")
+
+    def files(self):
+        return sorted(path.name for path in self.resolved.iterdir())
+
+    def saved(self):
+        return json.loads((self.root / "var/lib/homemesh/state.json").read_text())
+
+    def avahi(self, masked=False):
+        (self.root / "usr/lib/systemd/system").mkdir(parents=True)
+        (self.root / "usr/lib/systemd/system/avahi-daemon.service").touch()
+        (self.root / "usr/lib/libnss_mdns_minimal.so.2").touch()
+        if masked:
+            (self.state_dir / "masked-avahi-daemon.service").touch()
+
+    def enable(self):
+        code, steps = self.run_helper("enable")
+        self.assertEqual(steps[-1]["step"], "mdns")
+        self.assertEqual(code == 0, steps[-1]["ok"])
+        return steps[-1]["ok"], steps[-1]["msg"]
+
+    def test_not_set_anywhere(self):
+        ok, message = self.enable()
+        self.assertEqual((ok, message), (True, ".local names work (systemd-resolved)."))
+        self.assertEqual(self.files(), ["zz-homemesh-mdns.conf"])
+        self.assertIn("systemctl restart systemd-resolved.service", self.calls())
+        self.run_helper("disable")
+        self.assertEqual(self.files(), [])
+
+    def test_overrides_a_later_file_and_says_so(self):
+        self.off_in("90-dns.conf")
+        ok, message = self.enable()
+        self.assertTrue(ok, message)
+        self.assertIn("MulticastDNS=no in /etc/systemd/resolved.conf.d/90-dns.conf", message)
+        self.run_helper("disable")
+        self.assertEqual(self.files(), ["90-dns.conf"])
+
+    def test_takes_over_from_the_old_file_names(self):
+        self.off_in("90-dns.conf")
+        (self.state_dir / "running-NetworkManager.service").touch()
+        self.nm.mkdir(parents=True)
+        old = [self.resolved / "10-homemesh-mdns.conf", self.nm / "10-homemesh-mdns.conf"]
+        old[0].write_text("[Resolve]\nMulticastDNS=yes\n")
+        old[1].write_text("[connection]\nconnection.mdns=2\n")
+        (self.root / "var/lib/homemesh").mkdir(parents=True)
+        (self.root / "var/lib/homemesh/state.json").write_text(json.dumps(
+            {"users": ["ania"], "created": ["/" + str(path.relative_to(self.root)) for path in old] * 2}))
+        self.assertTrue(self.enable()[0])
+        self.assertTrue(self.enable()[0])
+        self.assertEqual(self.files(), ["90-dns.conf", "zz-homemesh-mdns.conf"])
+        self.assertEqual(sorted(path.name for path in self.nm.iterdir()), ["zz-homemesh-mdns.conf"])
+        self.assertEqual(self.saved()["created"], ["/etc/systemd/resolved.conf.d/zz-homemesh-mdns.conf",
+                                                   "/etc/NetworkManager/conf.d/zz-homemesh-mdns.conf"])
+        self.assertIn("nmcli general reload conf", self.calls())
+
+    def test_avahi_takes_over_when_resolved_cannot(self):
+        (self.state_dir / "port-5353-taken").touch()
+        self.avahi()
+        ok, message = self.enable()
+        self.assertEqual((ok, message), (True, ".local names work (Avahi)."))
+        self.assertEqual(self.files(), [])
+        self.assertIn("systemctl enable avahi-daemon.service", self.calls())
+        self.assertIn("systemctl restart avahi-daemon.service", self.calls())
+        nsswitch = self.root / "etc/nsswitch.conf"
+        self.assertIn("files mdns_minimal [NOTFOUND=return] resolve", nsswitch.read_text())
+        self.run_helper("disable")
+        self.assertIn("systemctl stop avahi-daemon.service", self.calls())
+        self.assertEqual(nsswitch.read_text(), "hosts: files resolve [!UNAVAIL=return] dns\n")
+
+    def test_masked_avahi_is_left_alone(self):
+        (self.state_dir / "port-5353-taken").touch()
+        self.avahi(masked=True)
+        ok, message = self.enable()
+        self.assertFalse(ok)
+        self.assertIn("masked", message)
+        self.assertEqual(self.files(), [])
+        self.assertNotIn("systemctl enable avahi-daemon.service", self.calls())
+
+    def test_names_the_file_it_cannot_override(self):
+        self.off_in("zzz-last.conf")
+        ok, message = self.enable()
+        self.assertFalse(ok)
+        self.assertIn("MulticastDNS=no in /etc/systemd/resolved.conf.d/zzz-last.conf", message)
+        self.assertEqual(self.files(), ["zzz-last.conf"])
 
 
 class TailscaleTest(HelperTest):
