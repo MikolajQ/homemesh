@@ -60,9 +60,10 @@ read-write or read-only, served from a sandbox.
 - **Choose what to share**: the whole home folder, or chosen folders, each
   read-write or read-only, served by sftp-server in a bubblewrap sandbox
   with no shell and no access to anything else.
-- **Away from home**: works with Tailscale, NetBird, ZeroTier, Yggdrasil,
-  Nebula or WireGuard; each connection uses the local network when it can
-  and the VPN otherwise.
+- **Away from home**: sets up Tailscale with one click (install, service and
+  login, no commands, with or without systemd) and also works with NetBird,
+  ZeroTier, Yggdrasil, Nebula or WireGuard; each connection uses the local
+  network when it can and the VPN otherwise.
 - **Light and universal**: GTK 4 without libadwaita, fits any desktop; no
   daemon (the system's sshd serves the files); works with systemd, OpenRC,
   runit, s6 or dinit; ufw and firewalld handled.
@@ -145,9 +146,10 @@ piaskownicy.
 - **Wybierasz, co udostępniasz**: cały katalog domowy albo wybrane foldery,
   każdy do zapisu lub tylko do odczytu, podawane przez sftp-server w
   piaskownicy bubblewrap, bez powłoki i bez dostępu do czegokolwiek innego.
-- **Poza domem**: działa z Tailscale, NetBird, ZeroTier, Yggdrasil, Nebula
-  albo WireGuard; każde połączenie idzie przez sieć lokalną, gdy się da, a w
-  przeciwnym razie przez VPN.
+- **Poza domem**: ustawia Tailscale jednym kliknięciem (instalacja, usługa i
+  logowanie, bez poleceń, z systemd i bez niego), działa też z NetBird,
+  ZeroTier, Yggdrasil, Nebula albo WireGuard; każde połączenie idzie przez
+  sieć lokalną, gdy się da, a w przeciwnym razie przez VPN.
 - **Lekki i uniwersalny**: GTK 4 bez libadwaita, pasuje do każdego pulpitu;
   bez demona (pliki podaje systemowy sshd); działa z systemd, OpenRC, runit,
   s6 i dinit; obsługuje ufw i firewalld.

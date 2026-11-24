@@ -18,7 +18,8 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import APP_ID, APP_NAME, __version__, paths, proto, render, share, state, sync, system, vpn  # noqa: E402
+from . import (APP_ID, APP_NAME, __version__, paths, proto, render, share, state, sync, system,  # noqa: E402
+               tailscale, vpn)
 from .discovery import Discovery  # noqa: E402
 from .i18n import _  # noqa: E402
 from .pairing import Session  # noqa: E402
@@ -47,6 +48,10 @@ list.boxed > row:not(:last-child) { border-bottom: 1px solid alpha(currentColor,
 .placeholder { padding: 18px; }
 .monospace { font-family: monospace; }
 """
+
+
+# A check mark: Adwaita no longer has emblem-ok-symbolic.
+OK_ICON = "object-select-symbolic"
 
 
 def label(text="", *classes, wrap=False, ellipsize=False, xalign=0.0, chars=56):
@@ -176,6 +181,18 @@ class Dialog(Gtk.Window):
         return widget
 
 
+def page_stack():
+    """Pages of a dialog, all as high as the highest: GTK widens a dialog that
+    gets lower, to fit its text in fewer lines."""
+    return Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, vhomogeneous=True)
+
+
+def page(*children, spacing=12, margin=0):
+    box = vbox(spacing, *children, margin=margin)
+    box.set_valign(Gtk.Align.CENTER)
+    return box
+
+
 def confirm(parent, title, text, action, callback):
     dialog = Dialog(parent, title)
     dialog.content(label(title, "big", wrap=True), label(text, wrap=True))
@@ -195,7 +212,7 @@ class StepsDialog(Dialog):
         super().__init__(parent, title, 480)
         self.content(label(title, "big", wrap=True))
         for item in result.steps:
-            icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic" if item.get("ok")
+            icon = Gtk.Image.new_from_icon_name(OK_ICON if item.get("ok")
                                                 else "dialog-warning-symbolic")
             icon.set_valign(Gtk.Align.START)
             self.content(hbox(10, icon, label(system.step_text(item), wrap=True, chars=50)))
@@ -234,35 +251,153 @@ class RenameDialog(Dialog):
             self.callback(name)
 
 
-class VpnHelpDialog(Dialog):
-    """How to reach the computers away from home."""
+class AwayDialog(Dialog):
+    """Access from away: what it takes, and Tailscale set up at a click."""
 
-    def __init__(self, parent):
+    def __init__(self, parent, tunnels):
         super().__init__(parent, _("Away from home"), 520)
-        commands = label("sudo pacman -S tailscale\nsudo systemctl enable --now tailscaled\nsudo tailscale up",
-                         "dim")
-        commands.set_selectable(True)
-        commands.add_css_class("monospace")
-        commands.set_margin_start(12)
-        self.content(
-            label(_("Access from away"), "big"),
-            label(_("At home computers talk over the local network. Away from home they need a VPN "
-                    "to reach each other over the internet; HomeMesh detects Tailscale, NetBird, "
-                    "ZeroTier, Yggdrasil, Nebula and WireGuard on its own and uses them when a "
-                    "computer is not on the local network. Your file manager's bookmarks then work "
-                    "the same at home and on the road."), wrap=True),
-            label(_("The simplest is Tailscale (a free account for personal use):"), "heading", wrap=True),
-            label(_("1. On every computer, install Tailscale and log in with the same account:"), wrap=True),
-            commands,
-            label(_("2. Open HomeMesh on the computers while they are at home, or log in to them "
-                    "again: they exchange their VPN addresses. Nothing else to set up."), wrap=True),
-            label(_("Away from home, files travel over your home's internet uplink, so large files "
-                    "are slower than on the local network."), "dim", "small", wrap=True))
-        self.add_button(_("Tailscale website"), self._website)
-        self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
+        self.window = parent
+        self.setup = None
+        self.url = None
+        self.working = False
+        self.stack = page_stack()
+        self.content(self.stack)
+        uplink = label(_("Away from home, files travel over your home's internet uplink, so large "
+                         "files are slower than on the local network."), "dim", "small", wrap=True)
+        if tunnels:
+            self.stack.add_named(vbox(
+                12, label(_("Access from away"), "big"),
+                label(_("This computer is reachable through {vpn}. Paired computers that also have a "
+                        "VPN open it from away, with the same bookmarks as at home.")
+                      .format(vpn=vpn.describe(tunnels)), wrap=True),
+                label(_("Your other computers need the VPN too. While they are at home, they "
+                        "exchange their VPN addresses by themselves."), wrap=True),
+                uplink), "info")
+        else:
+            self.stack.add_named(vbox(
+                12, label(_("Access from away"), "big"),
+                label(_("At home computers talk over the local network. Away from home they need a "
+                        "VPN to reach each other over the internet."), wrap=True),
+                label(_("HomeMesh can set up Tailscale for you: it installs it, turns it on and opens "
+                        "the login page in your browser. Tailscale is free for personal use."),
+                      wrap=True),
+                label(_("Do the same on each of your computers and log in with the same account. "
+                        "While they are at home, they exchange their VPN addresses by themselves."),
+                      wrap=True),
+                label(_("Already using NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? HomeMesh "
+                        "finds them by itself; there is nothing to set up."), "dim", "small",
+                      wrap=True),
+                uplink), "info")
 
-    def _website(self):
-        Gtk.UriLauncher.new("https://tailscale.com/download/linux").launch(self, None, None, None)
+        spinner = Gtk.Spinner(spinning=True, halign=Gtk.Align.CENTER)
+        spinner.set_size_request(32, 32)
+        self.work_title = label("", "big", wrap=True, xalign=0.5)
+        self.work_text = label("", wrap=True, xalign=0.5)
+        self.again = button(_("Open the page again"), lambda: self.url and self._open(self.url))
+        self.again.set_halign(Gtk.Align.CENTER)
+        self.stack.add_named(page(spinner, self.work_title, self.work_text, self.again, margin=12),
+                             "work")
+
+        self.result_icon = Gtk.Image(halign=Gtk.Align.CENTER)
+        self.result_icon.set_pixel_size(48)
+        self.result_title = label("", "big", wrap=True, xalign=0.5)
+        self.result_text = label("", wrap=True, xalign=0.5)
+        self.result_steps = vbox(8)
+        self.stack.add_named(page(self.result_icon, self.result_title, self.result_text, self.result_steps,
+                                  spacing=10, margin=6), "result")
+        self._info_buttons(bool(tunnels))
+        self.connect("close-request", self._closing)
+
+    def _info_buttons(self, connected):
+        self.clear_buttons()
+        if connected:
+            self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
+        else:
+            self.add_button(_("Close"), self.close)
+            self.set_focus(self.add_button(_("Set up Tailscale"), self.start, "suggested-action"))
+
+    def _closing(self, *_args):
+        if self.working:
+            self.working = False
+            self.setup.cancel()  # the window still picks up whatever got done
+        return False
+
+    def start(self):
+        self.working = True
+        self.url = None
+        self._stage("connect", None)
+        self.stack.set_visible_child_name("work")
+        self.clear_buttons()
+        self.add_button(_("Cancel"), self.close)
+        self.setup = tailscale.Setup(system.run_helper, lambda stage, value: idle(self._stage, stage, value))
+        setup = self.setup
+
+        def work():
+            error = setup.run()
+            idle(self._done, setup, error)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _stage(self, stage, value):
+        if not self.working:
+            return
+        self.again.set_visible(stage == "login")
+        if stage == "admin":
+            self.work_title.set_text(_("Installing and starting Tailscale…"))
+            self.work_text.set_text(_("If a window asks for the administrator password, enter it. "
+                                      "Downloading Tailscale can take a minute."))
+        elif stage == "connect":
+            self.work_title.set_text(_("Connecting to Tailscale…"))
+            self.work_text.set_text("")
+        elif stage == "login":
+            self.url = value
+            if tailscale.approval_page(value):
+                self.work_title.set_text(_("Approve this computer"))
+                self.work_text.set_text(_("Your Tailscale network wants new computers approved. The "
+                                          "admin page has opened in your browser."))
+            else:
+                self.work_title.set_text(_("Log in to Tailscale in your browser"))
+                self.work_text.set_text(_("The login page has opened in your browser. Use the same "
+                                          "account on all your computers. This window carries on "
+                                          "by itself once you have logged in."))
+            self._open(value)
+
+    def _open(self, url):
+        Gtk.UriLauncher.new(url).launch(self, None, None, None)
+
+    def _done(self, setup, error):
+        self.window.away_changed()
+        if not self.working or setup is not self.setup:
+            return  # closed in the meantime
+        self.working = False
+        self.stack.set_visible_child_name("result")
+        self.clear_buttons()
+        child = self.result_steps.get_first_child()
+        while child:
+            following = child.get_next_sibling()
+            self.result_steps.remove(child)
+            child = following
+        if error is None:
+            self.result_icon.set_from_icon_name(OK_ICON)
+            self.result_title.set_text(_("Tailscale is on"))
+            reach = _("This computer is reachable through {vpn}.").format(vpn=vpn.describe(setup.addresses)) \
+                if setup.addresses else _("This computer is connected to Tailscale.")
+            self.result_text.set_text(reach + " " + _("Now set up Tailscale the same way on your other "
+                                                      "computers, with the same account."))
+            self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
+            return
+        self.result_icon.set_from_icon_name("dialog-warning-symbolic")
+        self.result_title.set_text(_("Tailscale is not set up"))
+        result = setup.helper_result
+        steps = result.steps if result and not result.ok else []
+        self.result_text.set_text((result.error or "") if steps else error)  # the steps say it all
+        self.result_text.set_visible(bool(self.result_text.get_text()))
+        for item in steps:
+            icon = Gtk.Image.new_from_icon_name(OK_ICON if item.get("ok")
+                                                else "dialog-warning-symbolic")
+            icon.set_valign(Gtk.Align.START)
+            self.result_steps.append(hbox(10, icon, label(system.step_text(item), wrap=True, chars=50)))
+        self.add_button(_("Close"), self.close)
+        self.add_button(_("Try again"), self.start, "suggested-action")
 
 
 class ShareDialog(Dialog):
@@ -360,13 +495,13 @@ class PairDialog(Dialog):
         self.finished = False
         self.name = name
         self.peer = None
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, vhomogeneous=False)
+        self.stack = page_stack()
         self.content(self.stack)
 
         spinner = Gtk.Spinner(spinning=True, halign=Gtk.Align.CENTER)
         spinner.set_size_request(32, 32)
         self.wait_text = label(_("Connecting to {name}…").format(name=name), wrap=True, xalign=0.5)
-        self.stack.add_named(vbox(12, spinner, self.wait_text, margin=12), "wait")
+        self.stack.add_named(page(spinner, self.wait_text, margin=12), "wait")
 
         self.code_title = label(title, "big", wrap=True, xalign=0.5)
         self.code_label = label("", "code", xalign=0.5)
@@ -374,14 +509,14 @@ class PairDialog(Dialog):
         self.status = label("", "dim", wrap=True, xalign=0.5)
         warning = label(_("Paired computers have full access to each other's home folders. Pair "
                           "only your own computers."), "dim", "small", wrap=True, xalign=0.5)
-        self.stack.add_named(vbox(10, self.code_title, self.code_label, self.code_text, warning,
-                                  self.status), "code")
+        self.stack.add_named(page(self.code_title, self.code_label, self.code_text, warning, self.status,
+                                  spacing=10), "code")
 
         self.result_icon = Gtk.Image(halign=Gtk.Align.CENTER)
         self.result_icon.set_pixel_size(48)
         self.result_title = label("", "big", wrap=True, xalign=0.5)
         self.result_text = label("", wrap=True, xalign=0.5)
-        self.stack.add_named(vbox(10, self.result_icon, self.result_title, self.result_text, margin=6),
+        self.stack.add_named(page(self.result_icon, self.result_title, self.result_text, spacing=10, margin=6),
                              "result")
         self.add_button(_("Cancel"), self.close)
         self.connect("close-request", self._closing)
@@ -420,7 +555,7 @@ class PairDialog(Dialog):
 
     def done(self, card):
         self.finished = True
-        self.result_icon.set_from_icon_name("emblem-ok-symbolic")
+        self.result_icon.set_from_icon_name(OK_ICON)
         self.result_title.set_text(_("Paired with {name}").format(name=card["name"]))
         self.result_text.set_text(_("The home folder of {name} is now in your file manager's "
                                     "sidebar. The other computers in the group will learn about it "
@@ -588,7 +723,8 @@ class MainWindow(Gtk.ApplicationWindow):
         away_icon = Gtk.Image.new_from_icon_name("network-vpn-symbolic")
         away_icon.set_pixel_size(24)
         row = Gtk.ListBoxRow(activatable=False)
-        row.set_child(hbox(12, away_icon, away_texts, button(_("How does it work?"), self.show_vpn_help)))
+        self.away_button = button(_("Set up…"), self.show_away)
+        row.set_child(hbox(12, away_icon, away_texts, self.away_button))
         this_list.append(row)
 
         self.login_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
@@ -740,9 +876,11 @@ class MainWindow(Gtk.ApplicationWindow):
         if tunnels:
             self.away_text.set_text(_("Reachable through {vpn}. Paired computers that also have a "
                                       "VPN can open this computer from away too.").format(vpn=vpn.describe(tunnels)))
+            self.away_button.set_label(_("How does it work?"))
         else:
-            self.away_text.set_text(_("Only on the local network. From away you need a VPN such as "
-                                      "Tailscale."))
+            self.away_text.set_text(_("Only on the local network. HomeMesh can set up Tailscale, so "
+                                      "that your computers reach each other from anywhere."))
+            self.away_button.set_label(_("Set up…"))
         self._switch_guard = True
         self.switch.set_active(self.configured)
         self.switch.set_state(self.configured)
@@ -797,7 +935,7 @@ class MainWindow(Gtk.ApplicationWindow):
             hint("step", "list-add-symbolic", _("Another computer is nearby"),
                  _("Click “Connect” to add {name} to the group.").format(name=waiting[0]["name"]))
         else:
-            hint("done", "emblem-ok-symbolic", _("All set"),
+            hint("done", OK_ICON, _("All set"),
                  _("Paired computers are in your file manager's sidebar. A new computer only needs "
                    "pairing with one of them: the others learn about it by themselves."))
 
@@ -891,8 +1029,13 @@ class MainWindow(Gtk.ApplicationWindow):
         switch.set_state(wanted)
         return True
 
-    def show_vpn_help(self):
-        VpnHelpDialog(self).present()
+    def show_away(self):
+        AwayDialog(self, self.tunnels).present()
+
+    def away_changed(self):
+        """After setting Tailscale up: show its address, and tell the group."""
+        self.check_system()
+        self.sync_now(quiet=True)
 
     def ask_share(self):
         ShareDialog(self, share.current(self.st), self.save_share).present()
@@ -1169,7 +1312,7 @@ class App(Gtk.Application):
     def _shoot(self, path):
         target = self.window.content
         if self.options.get("vpn-help"):
-            dialog = VpnHelpDialog(self.window)
+            dialog = AwayDialog(self.window, [])
             dialog.present()
             GLib.timeout_add(800, lambda: (save_screenshot(dialog.get_child(), path), self.quit(), False)[2])
             return False

@@ -25,7 +25,7 @@ Linux computer already has.
 | **Introductions** | Pair a new computer with any member of the group and it gets to know all of them; members it never met learn about it the next time they talk. Removing a computer spreads the same way. |
 | **Your file manager** | Paired computers appear as bookmarks in GTK file managers (GVfs) and in Dolphin (KIO). A click mounts; optionally they mount at login. |
 | **Choose what to share** | The whole home folder, or only chosen folders, each read-write or read-only. Chosen folders are served from a sandbox: the rest of your home, your keys and the system are simply not there. |
-| **Away from home** | Works with the VPN you already use or install: Tailscale, NetBird, ZeroTier, Yggdrasil, Nebula, WireGuard. Each connection goes over the local network when possible and through the VPN otherwise, with the same bookmarks. |
+| **Away from home** | One click sets up Tailscale: HomeMesh installs it, starts it and opens the login page; no commands. Already have NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? It finds them by itself. Each connection goes over the local network when possible and through the VPN otherwise, with the same bookmarks. |
 | **Light** | GTK 4 without libadwaita, so it fits any desktop. No daemon: sharing is the system's `sshd`; the window is needed only to find and pair computers. Works with or without systemd. |
 | **Terminal too** | Everything the window does, `homemesh` does in a terminal, so headless machines can join. |
 
@@ -52,11 +52,11 @@ Linux computer already has.
 </td>
 <td width="50%" valign="top">
 
-**Away from home**: how to add a VPN.
+**Away from home**: Tailscale set up with one click.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/away-dark.png">
-  <img alt="Help window explaining access from away with Tailscale" src="docs/screenshots/en/away-light.png">
+  <img alt="Access from away window offering to set up Tailscale" src="docs/screenshots/en/away-light.png">
 </picture>
 
 </td>
@@ -102,14 +102,22 @@ cannot connect without a helper with a public address, and the existing VPNs
 do that job well. HomeMesh does not ship its own; it detects Tailscale,
 NetBird, ZeroTier, Yggdrasil, Nebula and WireGuard on its own.
 
-The simplest is Tailscale (free for personal use). On every computer:
+The simplest is Tailscale (free for personal use), and HomeMesh sets it up
+for you: in *Away from home* click **Set up…**, then **Set up Tailscale**.
+After the administrator password it:
+- installs Tailscale with the system's package manager (pacman, apt, dnf,
+  zypper, xbps or apk) or, if the distribution has no package, Tailscale's
+  own static build from pkgs.tailscale.com, checked against its sha256;
+- starts `tailscaled` at boot with systemd, OpenRC, runit, s6 or dinit,
+  writing the service definition itself when the package has none for that
+  init system (Artix, for example);
+- makes you Tailscale's operator, so the login and later changes need no
+  password;
+- opens the login page in your browser and carries on once you have logged in.
 
-    sudo pacman -S tailscale
-    sudo systemctl enable --now tailscaled
-    sudo tailscale up            # log in with the same account everywhere
-
-Then open HomeMesh on the computers while they are at home (or log in again):
-they exchange their VPN addresses. From then on every connection first checks
+Do the same on every computer, with the same account (`homemesh away` does it
+in a terminal). While the computers are at home they exchange their VPN
+addresses. From then on every connection first checks
 the local network (about 40 ms at home; away from home the check gives up
 after about a second) and uses the VPN only when the other computer is not
 there. Away from home, files travel over your home's internet
@@ -142,6 +150,7 @@ uplink, so large files are slower than at home.
     homemesh share home      # back to the whole home folder
     homemesh autostart on|off
     homemesh rename NAME     # rename this computer on the network
+    homemesh away            # set up Tailscale for access from away
     homemesh reset           # leave the group and remove HomeMesh's settings
 
 ## How it works
@@ -154,7 +163,9 @@ through polkit, or `sudo` in a terminal. It:
   41753/udp and 41753–41762/tcp; and SSH on the VPN interfaces;
 - turns on mDNS if `name.local` does not work yet.
 
-*Turn off* puts back what was there before.
+*Turn off* puts back what was there before. Setting up Tailscale goes through
+the same helper (see [Away from home](#away-from-home)); turning sharing off
+leaves Tailscale alone.
 
 **Finding computers**: while the window is open, HomeMesh announces itself on
 the local network over UDP broadcast. This works without Avahi. Nothing extra

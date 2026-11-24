@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 
-from . import APP_NAME, PORT, __version__, paths, proto, render, share, state, sync, system, vpn
+from . import APP_NAME, PORT, __version__, paths, proto, render, share, state, sync, system, tailscale, vpn
 from .discovery import Discovery
 from .i18n import _
 from .pairing import Session
@@ -62,7 +62,7 @@ def cmd_status(args):
     print(_("Shared: {what}").format(what=share.summary(share.current(st))))
     tunnels = card.get("vpn")
     print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
-          else _("Away from home: not reachable (needs a VPN such as Tailscale)"))
+          else _("Away from home: not reachable. Set up Tailscale: homemesh away"))
     print(_("At login: syncs the group and connects the chosen computers") if st.get("login", True)
           else _("At login: nothing (turn on: homemesh autostart on)"))
     peers = st["peers"]
@@ -93,6 +93,58 @@ def cmd_rename(args):
     if code == 0:
         sync.sync_all()
     return code
+
+
+def open_in_browser(url):
+    if not has_display():
+        return
+    try:
+        from gi.repository import Gio
+        Gio.AppInfo.launch_default_for_uri(url, None)
+    except Exception:
+        pass  # the address is printed anyway
+
+
+def cmd_away(args):
+    tunnels = vpn.addresses()
+    if tunnels and tailscale.backend_state() == "Running":
+        print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)))
+        return 0
+
+    def run_helper(helper_args):
+        result = system.run_helper(helper_args, terminal=True)
+        for step in result.steps:
+            print(f"  {'✓' if step.get('ok') else '✗'} {system.step_text(step)}")
+        return result
+
+    def report(stage, value):
+        if stage == "admin":
+            print(_("Installing and starting Tailscale (asks for the administrator password)…"))
+        elif stage == "connect":
+            print(_("Connecting to Tailscale…"))
+        elif stage == "login" and tailscale.approval_page(value):
+            print(_("Approve this computer in Tailscale's admin page: {url}").format(url=value))
+            open_in_browser(value)
+        elif stage == "login":
+            print(_("Log in to Tailscale in your browser (the same account on all your computers): "
+                    "{url}").format(url=value))
+            open_in_browser(value)
+
+    setup = tailscale.Setup(run_helper, report)
+    try:
+        error = setup.run()
+    except KeyboardInterrupt:
+        setup.cancel()
+        raise
+    if error:
+        print(f"✗ {error}")
+        return 1
+    print(_("Away from home: through {vpn}").format(vpn=vpn.describe(setup.addresses)) if setup.addresses
+          else _("This computer is connected to Tailscale."))
+    print(_("Now set up Tailscale the same way on your other computers, with the same account."))
+    if state.load()["peers"]:
+        sync.sync_all()  # the group learns this computer's VPN address
+    return 0
 
 
 def ask_yes(question):
@@ -378,6 +430,8 @@ def build_parser():
     remove.add_argument("name")
     remove.set_defaults(func=cmd_remove)
     sub.add_parser("sync", help=_("sync the group with the reachable computers")).set_defaults(func=cmd_sync)
+    sub.add_parser("away", help=_("reach the computers away from home: sets up Tailscale "
+                                  "(asks for the administrator password)")).set_defaults(func=cmd_away)
     rename = sub.add_parser("rename", help=_("rename this computer on the network"))
     rename.add_argument("name")
     rename.set_defaults(func=cmd_rename)

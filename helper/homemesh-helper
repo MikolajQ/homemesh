@@ -5,14 +5,19 @@
                                      firewall open for the local network; mDNS
     homemesh-helper disable          undo all of that (once no user needs it)
     homemesh-helper set-hostname N   rename this computer
+    homemesh-helper tailscale        Tailscale installed, started at boot and
+                                     controllable by the calling user
 
 Run through pkexec (from the window) or sudo (from a terminal). Prints one
 JSON object per step for the caller to show. Works with systemd, OpenRC,
-runit, s6 and dinit; with ufw or firewalld.
+runit, s6 and dinit; with ufw or firewalld; installs with pacman, apt, dnf,
+zypper, xbps or apk, or else Tailscale's own static build.
 
 Testing: as a normal user, HOMEMESH_HELPER_ROOT=/some/dir makes every path
-relative to that directory and HOMEMESH_HELPER_INIT picks the init system.
-Both are ignored when running as root.
+relative to that directory, HOMEMESH_HELPER_INIT picks the init system,
+HOMEMESH_HELPER_PM the package manager ("none" by default) and
+HOMEMESH_HELPER_TAILSCALE_URL where Tailscale's static builds come from.
+All are ignored when running as root.
 """
 
 import json
@@ -23,6 +28,8 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
+import time
 
 TEST = os.geteuid() != 0 and "HOMEMESH_HELPER_ROOT" in os.environ
 ROOT = os.environ["HOMEMESH_HELPER_ROOT"] if TEST else "/"
@@ -72,11 +79,14 @@ def step(name, ok, text, /, **args):
         failures.append(name)
 
 
-def run(*command, check=False, input=None):
+def run(*command, check=False, input=None, env=None, timeout=None):
     try:
-        done = subprocess.run(command, capture_output=True, text=True, input=input)
+        done = subprocess.run(command, capture_output=True, text=True, input=input, env=env,
+                              timeout=timeout)
     except FileNotFoundError:
         done = subprocess.CompletedProcess(command, 127, "", f"{command[0]}: not found")
+    except subprocess.TimeoutExpired:
+        done = subprocess.CompletedProcess(command, 124, "", f"{command[0]}: no answer")
     if check and done.returncode != 0:
         raise RuntimeError(f"{' '.join(command)}: {done.stderr.strip() or done.returncode}")
     return done
@@ -91,11 +101,12 @@ def read(path):
 
 
 def write(path, text, mode=0o644):
+    """Text or bytes, replacing the file in one step."""
     full = P(path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     tmp = full + ".homemesh-new"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(text)
+    with open(tmp, "wb") as f:
+        f.write(text if isinstance(text, bytes) else text.encode("utf-8"))
     os.chmod(tmp, mode)
     os.replace(tmp, full)
 
@@ -159,7 +170,7 @@ class Init:
         return service
 
     def runit_dirs(self):
-        if os.path.isdir("/run/runit/service"):  # Artix
+        if os.path.isdir(P("/run/runit/service")):  # Artix
             return "/etc/runit/sv", "/run/runit/service"
         return "/etc/sv", "/var/service"  # Void
 
@@ -168,13 +179,13 @@ class Init:
         if self.kind == "systemd":
             return run("systemctl", "cat", f"{service}.service").returncode == 0
         if self.kind == "openrc":
-            return os.path.exists(f"/etc/init.d/{service}")
+            return os.path.exists(P(f"/etc/init.d/{service}"))
         if self.kind == "runit":
-            return os.path.isdir(os.path.join(self.runit_dirs()[0], service))
+            return os.path.isdir(P(os.path.join(self.runit_dirs()[0], service)))
         if self.kind == "s6":
-            return os.path.isdir(f"/etc/s6/sv/{service}") or os.path.isdir(f"/etc/s6/adminsv/{service}")
+            return os.path.isdir(P(f"/etc/s6/sv/{service}")) or os.path.isdir(P(f"/etc/s6/adminsv/{service}"))
         if self.kind == "dinit":
-            return os.path.exists(f"/etc/dinit.d/{service}")
+            return os.path.exists(P(f"/etc/dinit.d/{service}"))
         return False
 
     def enabled(self, service):
@@ -185,12 +196,12 @@ class Init:
             return any(line.split("|")[0].strip() == service
                        for line in run("rc-update", "show", "default").stdout.splitlines())
         if self.kind == "runit":
-            return os.path.exists(os.path.join(self.runit_dirs()[1], service))
+            return os.path.lexists(P(os.path.join(self.runit_dirs()[1], service)))
         if self.kind == "s6":
             out = run("s6-rc-db", "-c", "/etc/s6/rc/compiled", "contents", "default").stdout
             return service in out.split() or f"{service}-srv" in out.split()
         if self.kind == "dinit":
-            return os.path.exists(f"/etc/dinit.d/boot.d/{service}")
+            return os.path.lexists(P(f"/etc/dinit.d/boot.d/{service}"))
         return False
 
     def running(self, service):
@@ -216,9 +227,10 @@ class Init:
             run("rc-update", "add", service, "default", check=True)
         elif self.kind == "runit":
             sv, live = self.runit_dirs()
-            link = os.path.join(live, service)
-            if not os.path.exists(link):
-                os.symlink(os.path.join(sv, service), link)
+            link = P(os.path.join(live, service))
+            if not os.path.lexists(link):
+                os.makedirs(os.path.dirname(link), exist_ok=True)
+                os.symlink(P(os.path.join(sv, service)), link)
         elif self.kind == "s6":
             run("s6-rc-bundle-update", "-c", "/etc/s6/rc/compiled", "add", "default", service, check=True)
         elif self.kind == "dinit":
@@ -233,7 +245,7 @@ class Init:
         elif self.kind == "openrc":
             run("rc-update", "del", service, "default")
         elif self.kind == "runit":
-            link = os.path.join(self.runit_dirs()[1], service)
+            link = P(os.path.join(self.runit_dirs()[1], service))
             if os.path.islink(link):
                 os.unlink(link)
         elif self.kind == "s6":
@@ -255,6 +267,22 @@ class Init:
             run("s6-rc", "-u", "change", service, check=True)
         elif self.kind == "dinit":
             run("dinitctl", "restart" if self.running(service) else "start", service, check=True)
+
+    def start(self, service):
+        service = self.name(service)
+        if self.kind == "systemd":
+            run("systemctl", "start", f"{service}.service", check=True)
+        elif self.kind == "openrc":
+            run("rc-service", service, "start", check=True)
+        elif self.kind == "runit":
+            for _attempt in range(8):  # runsvdir notices a new link within five seconds
+                if run("sv", "up", service).returncode == 0:
+                    break
+                time.sleep(1)
+        elif self.kind == "s6":
+            run("s6-rc", "-u", "change", service, check=True)
+        elif self.kind == "dinit":
+            run("dinitctl", "start", service, check=True)
 
     def stop(self, service):
         service = self.name(service)
@@ -485,6 +513,256 @@ def revert_mdns(init, state):
         run("systemctl", "restart", "systemd-resolved.service")
 
 
+# --------------------------------------------------------------- Tailscale
+#
+# Access from away. Tailscale gets installed, runs at boot and accepts orders
+# from the calling user (its "operator"): HomeMesh then logs in as that user,
+# so the login page opens in their own browser.
+
+TAILSCALE_PACKAGES = "https://pkgs.tailscale.com/stable/"
+TAILSCALE_ARCHES = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64",
+                    "armv7l": "arm", "armv6l": "arm", "i686": "386", "i386": "386",
+                    "riscv64": "riscv64"}
+TAILSCALED_ARGS = ("--state=/var/lib/tailscale/tailscaled.state "
+                   "--socket=/var/run/tailscale/tailscaled.sock --port=41641")
+TAILSCALE_WAIT = 20
+# pkexec's PATH has no /usr/local, where Tailscale's own build goes.
+BIN_DIRS = ("/usr/bin", "/usr/sbin", "/bin", "/sbin", "/usr/local/bin", "/usr/local/sbin")
+PACKAGE_MANAGERS = (
+    ("pacman", ("pacman", "-S", "--needed", "--noconfirm", "tailscale")),
+    ("apt-get", ("apt-get", "install", "-y", "tailscale")),
+    ("dnf", ("dnf", "install", "-y", "tailscale")),
+    ("zypper", ("zypper", "--non-interactive", "install", "tailscale")),
+    ("xbps-install", ("xbps-install", "-Sy", "tailscale")),
+    ("apk", ("apk", "add", "tailscale")),
+)
+
+# Service definitions for when the package brings none for this init system
+# (Arch's package on Artix, Tailscale's static build anywhere).
+SYSTEMD_UNIT = """\
+# Written by HomeMesh for Tailscale.
+[Unit]
+Description=Tailscale node agent
+Wants=network-pre.target
+After=network-pre.target NetworkManager.service systemd-resolved.service
+
+[Service]
+ExecStart={command}
+ExecStopPost={daemon} --cleanup
+Restart=on-failure
+RuntimeDirectory=tailscale
+RuntimeDirectoryMode=0755
+StateDirectory=tailscale
+StateDirectoryMode=0700
+Type=notify
+
+[Install]
+WantedBy=multi-user.target
+"""
+OPENRC_SCRIPT = """\
+#!/sbin/openrc-run
+# Written by HomeMesh for Tailscale.
+description="Tailscale node agent"
+supervisor=supervise-daemon
+command="{daemon}"
+command_args="{args}"
+
+depend() {{
+	need net
+	after firewall
+	use dns
+}}
+
+start_pre() {{
+	checkpath -d -m 0700 /var/lib/tailscale
+}}
+
+stop_post() {{
+	"{daemon}" --cleanup
+}}
+"""
+RUN_SCRIPT = """\
+#!/bin/sh
+# Written by HomeMesh for Tailscale.
+exec 2>&1
+mkdir -p /var/lib/tailscale
+exec {command}
+"""
+FINISH_SCRIPT = """\
+#!/bin/sh
+exec {daemon} --cleanup
+"""
+DINIT_SERVICE = """\
+# Written by HomeMesh for Tailscale.
+type = process
+command = {command}
+restart = true
+smooth-recovery = true
+"""
+
+
+def tool(name):
+    """Full path of a program (under ROOT when testing)."""
+    for directory in BIN_DIRS:
+        path = P(f"{directory}/{name}")
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None if TEST else shutil.which(name)
+
+
+def real_path(path):
+    """A path as the running system sees it (differs from ours only in tests)."""
+    return "/" + os.path.relpath(path, ROOT)
+
+
+def last_line(text):
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    return lines[-1] if lines else ""
+
+
+def package_manager():
+    if TEST:
+        forced = os.environ.get("HOMEMESH_HELPER_PM", "none")
+        return next((item for item in PACKAGE_MANAGERS if item[0] == forced), None)
+    return next((item for item in PACKAGE_MANAGERS if shutil.which(item[0])), None)
+
+
+def fetch(url, limit):
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=60) as response:
+        data = response.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError(f"{url}: too large")
+    return data
+
+
+def install_static_tailscale():
+    """Tailscale's own build into /usr/local/bin, checked against its sha256.
+    Returns the version."""
+    import hashlib
+    import io
+    import platform
+    arch = TAILSCALE_ARCHES.get(platform.machine())
+    if not arch:
+        raise RuntimeError(f"no Tailscale build for {platform.machine()}")
+    base = os.environ.get("HOMEMESH_HELPER_TAILSCALE_URL", TAILSCALE_PACKAGES) if TEST else TAILSCALE_PACKAGES
+    index = json.loads(fetch(base + "?mode=json", 1 << 20))
+    name = index["Tarballs"][arch]
+    if not re.match(r"tailscale_[0-9.]+_[a-z0-9]+\.tgz\Z", name):
+        raise ValueError(f"unexpected file name {name!r}")
+    archive = fetch(base + name, 300 << 20)
+    expected = fetch(base + name + ".sha256", 1024).decode("ascii", "replace").split()
+    if not expected or hashlib.sha256(archive).hexdigest() != expected[0].lower():
+        raise ValueError(f"{name}: checksum does not match")
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        members = {os.path.basename(m.name): m for m in tar.getmembers() if m.isfile()}
+        for program in ("tailscale", "tailscaled"):
+            if program not in members:
+                raise ValueError(f"{name}: no {program} inside")
+            write(f"/usr/local/bin/{program}", tar.extractfile(members[program]).read(), 0o755)
+    return name.split("_")[1]
+
+
+def install_tailscale():
+    if tool("tailscale") and tool("tailscaled"):
+        step("install", True, N_("Tailscale is already installed."))
+        return True
+    problems = []
+    manager = package_manager()
+    if manager:
+        name, command = manager
+        done = run(*command, env=dict(os.environ, DEBIAN_FRONTEND="noninteractive"), timeout=900)
+        if done.returncode == 0 and tool("tailscale") and tool("tailscaled"):
+            step("install", True, N_("Installed Tailscale with {tool}."), tool=name)
+            return True
+        problems.append(f"{name}: {last_line(done.stderr) or last_line(done.stdout) or done.returncode}")
+    try:  # not in this distribution's repositories, or the package manager is busy
+        version = install_static_tailscale()
+    except (OSError, ValueError, KeyError, RuntimeError, tarfile.TarError) as error:
+        problems.append(f"tailscale.com: {error}")
+        step("install", False, N_("Could not install Tailscale: {error}"), error="; ".join(problems))
+        return False
+    step("install", True, N_("Installed Tailscale {version} from tailscale.com."), version=version)
+    return True
+
+
+def tailscale_service(init, daemon):
+    """The name of tailscaled's service, written first if the package has none
+    for this init system; None for an unknown init system."""
+    for name in ("tailscaled", "tailscale"):  # Alpine calls it tailscale
+        if init.installed(name):
+            return name
+    daemon = real_path(daemon)
+    command = f"{daemon} {TAILSCALED_ARGS}"
+    if init.kind == "systemd":
+        write("/etc/systemd/system/tailscaled.service", SYSTEMD_UNIT.format(command=command, daemon=daemon))
+        run("systemctl", "daemon-reload")
+    elif init.kind == "openrc":
+        write("/etc/init.d/tailscaled", OPENRC_SCRIPT.format(daemon=daemon, args=TAILSCALED_ARGS), 0o755)
+    elif init.kind == "runit":
+        sv = init.runit_dirs()[0]
+        write(f"{sv}/tailscaled/run", RUN_SCRIPT.format(command=command), 0o755)
+        write(f"{sv}/tailscaled/finish", FINISH_SCRIPT.format(daemon=daemon), 0o755)
+    elif init.kind == "s6":
+        write("/etc/s6/sv/tailscaled/type", "longrun\n")
+        write("/etc/s6/sv/tailscaled/run", RUN_SCRIPT.format(command=command), 0o755)
+        write("/etc/s6/adminsv/default/contents.d/tailscaled", "")
+        run("s6-db-reload", check=True)
+    elif init.kind == "dinit":
+        os.makedirs(P("/var/lib/tailscale"), mode=0o700, exist_ok=True)
+        write("/etc/dinit.d/tailscaled", DINIT_SERVICE.format(command=command))
+    else:
+        return None
+    return "tailscaled"
+
+
+def tailscale_state(cli):
+    """BackendState ("NeedsLogin", "Running"…), or None while tailscaled does not answer."""
+    done = run(cli, "status", "--json", timeout=10)
+    try:
+        return json.loads(done.stdout or "null").get("BackendState")
+    except (ValueError, AttributeError):
+        return None
+
+
+def start_tailscale(init):
+    if init.kind == "unknown":
+        step("service", False, N_("Unknown init system. Turn on the tailscaled service by hand."))
+        return False
+    cli = tool("tailscale")
+    try:
+        service = tailscale_service(init, tool("tailscaled"))
+        if not init.enabled(service):
+            init.enable(service)
+        if not init.running(service):
+            init.start(service)
+    except (RuntimeError, OSError) as error:
+        step("service", False, N_("Could not start Tailscale: {error}"), error=error)
+        return False
+    deadline = time.monotonic() + TAILSCALE_WAIT
+    while not tailscale_state(cli):
+        if time.monotonic() > deadline:
+            step("service", False, N_("Tailscale did not start within {seconds} seconds."),
+                 seconds=TAILSCALE_WAIT)
+            return False
+        time.sleep(0.5)
+    step("service", True, N_("Tailscale is running and will start with the computer."))
+    return True
+
+
+def allow_operator():
+    user = calling_user()
+    if user == "root":
+        return
+    done = run(tool("tailscale"), "set", f"--operator={user}", timeout=30)
+    if done.returncode != 0:
+        step("operator", False, N_("Could not let {user} control Tailscale: {error}"), user=user,
+             error=last_line(done.stderr) or done.returncode)
+        return
+    step("operator", True, N_("{user} can log in to Tailscale and turn it on and off without the "
+                              "administrator password."), user=user)
+
+
 # ---------------------------------------------------------------- commands
 
 def cmd_enable():
@@ -553,6 +831,11 @@ def cmd_set_hostname(name):
     step("hostname", True, N_("This computer is now called {name} ({name}.local)."), name=name)
 
 
+def cmd_tailscale():
+    if install_tailscale() and start_tailscale(Init()):
+        allow_operator()
+
+
 def main(argv):
     if os.geteuid() != 0 and not TEST:
         print("homemesh-helper: run as root (pkexec or sudo)", file=sys.stderr)
@@ -563,6 +846,8 @@ def main(argv):
         cmd_disable()
     elif len(argv) == 3 and argv[1] == "set-hostname":
         cmd_set_hostname(argv[2])
+    elif len(argv) == 2 and argv[1] == "tailscale":
+        cmd_tailscale()
     else:
         print(__doc__, file=sys.stderr)
         return 2
