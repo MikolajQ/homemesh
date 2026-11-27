@@ -4,7 +4,25 @@
 import os
 import sys
 
-here = os.path.dirname(os.path.realpath(__file__))
+
+def open_standard_streams():
+    """Some desktops start their autostart programs with standard input closed
+    (LXQt does). Python then has no sys.stdin, and the next file opened would
+    take descriptor 0 and be handed to child processes as their input."""
+    for fd, name, mode in ((0, "stdin", "r"), (1, "stdout", "w"), (2, "stderr", "w")):
+        try:
+            os.fstat(fd)
+        except OSError:
+            null = os.open(os.devnull, os.O_RDWR)
+            if null != fd:
+                os.dup2(null, fd)
+                os.close(null)
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(fd, mode, closefd=False))
+
+
+open_standard_streams()
+here =os.path.dirname(os.path.realpath(__file__))
 prefix = os.path.dirname(here)
 for candidate in (prefix, os.path.join(prefix, "lib", "homemesh")):
     if os.path.isfile(os.path.join(candidate, "homemesh", "cli.py")):

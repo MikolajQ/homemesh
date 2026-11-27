@@ -91,8 +91,12 @@ def sync_all(only=None, rounds=2):
     return report
 
 
-def serve(stdin=sys.stdin.buffer, stdout=sys.stdout):
+def serve(stdin=None, stdout=None):
     """The far end of `exchange`, run by SSH on the peer."""
+    # Not as default values: those are taken at import, when there may be no
+    # standard input at all.
+    stdin = stdin or sys.stdin.buffer
+    stdout = stdout or sys.stdout
     data = json.loads(stdin.read(MAX_INPUT) or b"{}")
     sender = data.get("from") if isinstance(data, dict) else None
     with state.transaction() as st:

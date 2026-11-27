@@ -248,7 +248,7 @@ systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 
 ## Dla programistów
 
-    make test                            # 158 testów; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 159 testów; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 
