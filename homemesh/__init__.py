@@ -5,7 +5,7 @@ computers introduce each other, so a new computer paired with any member
 of the group gets to know all of them.
 """
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 
 APP_ID = "io.github.MikolajQ.HomeMesh"
 APP_NAME = "HomeMesh"
