@@ -200,15 +200,24 @@ def page(*children, spacing=12, margin=0):
     return box
 
 
-def confirm(parent, title, text, action, callback):
+def confirm(parent, title, text, action, callback, cancelled=None):
+    """cancelled: called when the window closes any other way."""
     dialog = Dialog(parent, title)
     dialog.content(label(title, "big", wrap=True), label(text, wrap=True))
     dialog.add_button(_("Cancel"), dialog.close)
+    accepted = []
 
     def accept():
+        accepted.append(True)
         dialog.close()
         callback()
     dialog.add_button(action, accept, "destructive-action")
+
+    def closing(*_args):
+        if cancelled and not accepted:
+            cancelled()
+        return False  # close it
+    dialog.connect("close-request", closing)
     dialog.present()
 
 
@@ -265,11 +274,13 @@ class RenameDialog(Dialog):
 
 
 class AwayDialog(Dialog):
-    """Access from away: what it takes, and Tailscale set up at a click."""
+    """Access from away: what it takes, and Tailscale set up at a click.
+    again: Tailscale is set up and off, so it just turns back on."""
 
-    def __init__(self, parent, tunnels):
+    def __init__(self, parent, tunnels, again=False):
         super().__init__(parent, _("Away from home"), 520)
         self.window = parent
+        self.again = again
         self.setup = None
         self.url = None
         self.working = False
@@ -320,6 +331,8 @@ class AwayDialog(Dialog):
                                   spacing=10, margin=6), "result")
         self._info_buttons(bool(tunnels))
         self.connect("close-request", self._closing)
+        if again:
+            self.start()
 
     def _info_buttons(self, connected):
         self.clear_buttons()
@@ -333,6 +346,7 @@ class AwayDialog(Dialog):
         if self.working:
             self.working = False
             self.setup.cancel()  # the window still picks up whatever got done
+        self.window.update_this()  # its switch, if this was not set up after all
         return False
 
     def start(self):
@@ -394,8 +408,8 @@ class AwayDialog(Dialog):
             self.result_title.set_text(_("Tailscale is on"))
             reach = _("This computer is reachable through {vpn}.").format(vpn=vpn.describe(setup.addresses)) \
                 if setup.addresses else _("This computer is connected to Tailscale.")
-            self.result_text.set_text(reach + " " + _("Now set up Tailscale the same way on your other "
-                                                      "computers, with the same account."))
+            self.result_text.set_text(reach if self.again else reach + " " + _(
+                "Now set up Tailscale the same way on your other computers, with the same account."))
             self.set_focus(self.add_button(_("Close"), self.close, "suggested-action"))
             return
         self.result_icon.set_from_icon_name("dialog-warning-symbolic")
@@ -746,6 +760,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.discovery = self.server = None
         self.helper_busy = self.installing = False
         self.tunnels = []
+        self.away_busy = False
 
         header = Gtk.HeaderBar()
         menu = Gio.Menu()
@@ -787,8 +802,10 @@ class MainWindow(Gtk.ApplicationWindow):
         away_icon = Gtk.Image.new_from_icon_name("network-vpn-symbolic")
         away_icon.set_pixel_size(24)
         row = Gtk.ListBoxRow(activatable=False)
-        self.away_button = button(_("Set up…"), self.show_away)
-        row.set_child(hbox(12, away_icon, away_texts, self.away_button))
+        self.away_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        self.away_switch.connect("state-set", self._away_changed)
+        row.set_child(hbox(12, away_icon, away_texts, button(_("How does it work?"), self.show_away),
+                           self.away_switch))
         this_list.append(row)
 
         self.login_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
@@ -939,18 +956,25 @@ class MainWindow(Gtk.ApplicationWindow):
         self.this_text.set_text(text)
         self.share_text.set_text(share.summary(share.current(self.st)))
         tunnels = self.tunnels
-        if tunnels:
+        if self.away_busy:
+            self.away_text.set_text(_("Turning Tailscale off…"))
+        elif tunnels:
             self.away_text.set_text(_("Reachable through {vpn}. Paired computers that also have a "
                                       "VPN can open this computer from away too.").format(vpn=vpn.describe(tunnels)))
-            self.away_button.set_label(_("How does it work?"))
         else:
             self.away_text.set_text(_("Only on the local network. HomeMesh can set up Tailscale, so "
                                       "that your computers reach each other from anywhere."))
-            self.away_button.set_label(_("Set up…"))
+        # HomeMesh turns off only the Tailscale it sets up, not a VPN someone runs by hand.
+        others = bool(tunnels) and not any(item["kind"] == "Tailscale" for item in tunnels)
+        self.away_switch.set_tooltip_text(_("Turn {vpn} off where you set it up.").format(vpn=tunnels[0]["kind"])
+                                          if others else None)
         self._switch_guard = True
         self.switch.set_active(self.configured)
         self.switch.set_state(self.configured)
         self.switch.set_sensitive(not self.helper_busy)
+        self.away_switch.set_active(bool(tunnels))
+        self.away_switch.set_state(bool(tunnels))
+        self.away_switch.set_sensitive(not self.away_busy and not others)
         login = self.st.get("login", True)
         self.login_switch.set_active(login)
         self.login_switch.set_state(login)
@@ -1112,7 +1136,8 @@ class MainWindow(Gtk.ApplicationWindow):
             confirm(self, _("Turn sharing off?"),
                     _("Paired computers lose access to this computer. The group stays: turn "
                       "sharing back on and everything works as before."),
-                    _("Turn off"), lambda: self.run_helper(["disable"], _("Sharing is off.")))
+                    _("Turn off"), lambda: self.run_helper(["disable"], _("Sharing is off.")),
+                    cancelled=self.update_this)
         return True  # the switch follows the real state once the helper is done
 
     def enable(self):
@@ -1141,9 +1166,42 @@ class MainWindow(Gtk.ApplicationWindow):
         AwayDialog(self, self.tunnels).present()
 
     def away_changed(self):
-        """After setting Tailscale up: show its address, and tell the group."""
+        """After turning Tailscale on or off: show it, and tell the group."""
         self.check_system()
         self.sync_now(quiet=True)
+
+    def _away_changed(self, _switch, wanted):
+        if self._switch_guard:
+            return False
+        if wanted:
+            def work():
+                again = tailscale.backend_state() == "Stopped"  # set up before, turned off since
+                idle(lambda: AwayDialog(self, [], again).present())
+            threading.Thread(target=work, daemon=True).start()
+        else:
+            confirm(self, _("Turn access from away off?"),
+                    _("HomeMesh turns Tailscale off on this computer, so paired computers reach it only on the "
+                      "local network. Turn it back on here at any time, without logging in again."),
+                    _("Turn off"), self.away_off, cancelled=self.update_this)
+        return True  # the switch follows the real state once that is done
+
+    def away_off(self):
+        self.away_busy = True
+        self.update_this()
+
+        def work():
+            error = tailscale.turn_off(system.run_helper)
+            if error is None:
+                with state.transaction() as st:
+                    state.forget_vpn(st)
+            idle(self._away_off_done, error)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _away_off_done(self, error):
+        self.away_busy = False
+        self.toast(error or _("Access from away is off."))
+        self.update_this()
+        self.away_changed()
 
     def ask_share(self):
         ShareDialog(self, share.current(self.st), self.save_share).present()

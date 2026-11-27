@@ -1,4 +1,5 @@
-"""Setting Tailscale up from the window or `homemesh away`, against a stand-in tailscale."""
+"""Setting Tailscale up and turning it off from the window or `homemesh away`,
+against a stand-in tailscale."""
 
 import os
 import shutil
@@ -12,8 +13,8 @@ import support  # noqa: F401  (the path to homemesh, English messages)
 from homemesh import system, tailscale
 
 # State in files under $TS_DIR: "state" holds BackendState (no file: the
-# service is not running), "operator" lets this user log in, "logged-in" is
-# the person finishing the login in the browser.
+# service is not running), "operator" lets this user log in and turn it off,
+# "logged-in" is the person finishing the login in the browser.
 FAKE = r"""#!/bin/sh
 D="$TS_DIR"
 echo "$* USER=$USER" >> "$D/log"
@@ -26,11 +27,16 @@ case "$1" in
       printf "Access denied: checkprefs access denied\n\nUse 'sudo tailscale up'.\nTo not require root, use 'sudo tailscale set --operator=\$USER' once.\n" >&2
       exit 1; }
     [ "$(cat "$D/state")" = Running ] && exit 0
-    printf '\nTo authenticate, visit:\n\n\thttps://login.tailscale.com/a/0123abcd\n\n' >&2
+    [ -f "$D/logged-in" ] || printf '\nTo authenticate, visit:\n\n\thttps://login.tailscale.com/a/0123abcd\n\n' >&2
     i=0
     while [ ! -f "$D/logged-in" ]; do sleep 0.05; i=$((i+1)); [ $i -gt 200 ] && exit 1; done
     echo Running > "$D/state"
     echo "Success." >&2;;
+  down)
+    [ -f "$D/operator" ] || {
+      printf "Access denied: prefs write access denied\n\nUse 'sudo tailscale down'.\nTo not require root, use 'sudo tailscale set --operator=\$USER' once.\n" >&2
+      exit 1; }
+    echo Stopped > "$D/state";;
 esac
 """
 
@@ -121,6 +127,46 @@ class SetupTest(unittest.TestCase):
         (self.dir / "logged-in").touch()
         _setup, error = self.run_setup()
         self.assertIsNone(error)
+        self.assertEqual(tailscale.backend_state(), "Running")
+        self.assertEqual(self.stages, [("connect", None)])
+
+    def test_turn_off(self):
+        self.set_state("Running")
+        (self.dir / "operator").touch()
+        self.assertIsNone(tailscale.turn_off(self.helper))
+        self.assertEqual(tailscale.backend_state(), "Stopped")
+        self.assertEqual(self.helper_calls, [])
+
+    def test_turn_off_tailscale_set_up_without_homemesh(self):
+        """Not its operator yet: the helper makes them one, and then it turns off."""
+        self.set_state("Running")
+        self.assertIsNone(tailscale.turn_off(self.helper))
+        self.assertEqual(self.helper_calls, [["tailscale"]])
+        self.assertEqual(tailscale.backend_state(), "Stopped")
+
+    def test_turn_off_fails(self):
+        self.set_state("Running")
+        self.helper_ok = False
+        self.assertEqual(tailscale.turn_off(self.helper), "Not everything worked")
+        self.assertEqual(tailscale.backend_state(), "Running")
+
+    def test_turn_off_what_is_off(self):
+        self.assertIsNone(tailscale.turn_off(self.helper))  # the service does not run
+        self.set_state("Stopped")
+        self.assertIsNone(tailscale.turn_off(self.helper))
+        os.environ["HOMEMESH_TAILSCALE"] = ""  # not installed
+        self.assertIsNone(tailscale.turn_off(self.helper))
+        self.assertNotIn("down", (self.dir / "log").read_text())
+        self.assertEqual(self.helper_calls, [])
+
+    def test_back_on_without_logging_in_again(self):
+        self.set_state("Running")
+        (self.dir / "operator").touch()
+        (self.dir / "logged-in").touch()
+        tailscale.turn_off(self.helper)
+        _setup, error = self.run_setup()
+        self.assertIsNone(error)
+        self.assertEqual(self.stages, [("connect", None)])
         self.assertEqual(tailscale.backend_state(), "Running")
 
     def test_helper_failure(self):

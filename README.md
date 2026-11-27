@@ -107,7 +107,8 @@ do that job well. HomeMesh does not ship its own; it detects Tailscale,
 NetBird, ZeroTier, Yggdrasil, Nebula and WireGuard on its own.
 
 The simplest is Tailscale (free for personal use), and HomeMesh sets it up
-for you: in *Away from home* click **Set up…**, then **Set up Tailscale**.
+for you: turn on the switch in *Away from home*, then click **Set up
+Tailscale**.
 After the administrator password it:
 - installs Tailscale with the system's package manager (pacman, apt, dnf,
   zypper, xbps or apk) or, if the distribution has no package, Tailscale's
@@ -127,6 +128,13 @@ the local network (about 40 ms at home; away from home the check gives up
 after about a second) and uses the VPN only when the other computer is not
 there. Away from home, files travel over your home's internet
 uplink, so large files are slower than at home.
+
+The same switch turns Tailscale off on this computer (`homemesh away off`).
+Paired computers then reach it only on the local network, and its VPN address
+leaves its card at once instead of being kept for a VPN that is off for the
+moment. Tailscale stays installed and logged in, so turning it back on takes
+a second and no login. A VPN you run by hand stays on: turn it off where you
+set it up.
 
 The VPN also helps at home where the [local network keeps
 breaking](docs/local-network.md): after the second break in three days SSH
@@ -160,6 +168,7 @@ tries the VPN first.
     homemesh autostart on|off
     homemesh rename NAME     # rename this computer on the network
     homemesh away            # set up Tailscale for access from away
+    homemesh away off        # turn Tailscale off again
     homemesh reset           # leave the group and remove HomeMesh's settings
 
 ## How it works
@@ -205,7 +214,8 @@ addresses). Whenever members talk (window open, login, pairing, another VPN
 address), they swap what they know through `ssh … homemesh sync-serve`. The
 newer card wins, and removals leave a dated tombstone so they spread too. VPN
 addresses stay on the card while the VPN is down (Tailscale connects a moment
-after login), until it has been down for half a year.
+after login), until it has been down for half a year or is turned off in
+HomeMesh.
 
 **At login**: a short task (XDG autostart, can be turned off) catches up with
 the group and mounts the computers marked *Connect at login*, then exits.
@@ -234,7 +244,7 @@ computers [keeps breaking](docs/local-network.md); the two tell each other.
 
 ## Status
 
-Version 0.6: young. It has been tried between Arch-based computers with GNOME,
+Version 0.7: young. It has been tried between Arch-based computers with GNOME,
 KDE Plasma and LXQt. Marking the computers that are off has been tried with
 pcmanfm-qt; Dolphin's side, installing packages outside Arch and the systems
 without systemd (OpenRC, runit, s6, dinit) are written but not yet tested for
@@ -247,7 +257,7 @@ real. Reports are welcome.
 
 ## Development
 
-    make test                            # 142 tests, before a release; the integration tests run private sshd instances
+    make test                            # 148 tests, before a release; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 

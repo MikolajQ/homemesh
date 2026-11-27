@@ -118,15 +118,17 @@ def open_in_browser(url):
 
 
 def cmd_away(args):
-    tunnels = vpn.addresses()
-    if tunnels and tailscale.backend_state() == "Running":
-        print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)))
-        return 0
-
     def run_helper(helper_args):
         result = system.run_helper(helper_args, terminal=True)
         print_steps(result)
         return result
+
+    if args.state == "off":
+        return away_off(run_helper)
+    tunnels = vpn.addresses()
+    if tunnels and tailscale.backend_state() == "Running":
+        print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)))
+        return 0
 
     def report(stage, value):
         if stage == "admin":
@@ -155,6 +157,21 @@ def cmd_away(args):
     print(_("Now set up Tailscale the same way on your other computers, with the same account."))
     if state.load()["peers"]:
         sync.sync_all()  # the group learns this computer's VPN address
+    return 0
+
+
+def away_off(run_helper):
+    error = tailscale.turn_off(run_helper)
+    if error:
+        print(f"✗ {error}")
+        return 1
+    with state.transaction() as st:
+        state.forget_vpn(st)
+    tunnels = vpn.addresses()
+    print(_("Away from home: still through {vpn}, which HomeMesh does not turn off").format(
+        vpn=vpn.describe(tunnels)) if tunnels else _("Away from home: off. Turn on: homemesh away"))
+    if state.load()["peers"]:
+        sync.sync_all()  # the group forgets this computer's VPN address
     return 0
 
 
@@ -452,8 +469,10 @@ def build_parser():
     remove.add_argument("name")
     remove.set_defaults(func=cmd_remove)
     sub.add_parser("sync", help=_("sync the group with the reachable computers")).set_defaults(func=cmd_sync)
-    sub.add_parser("away", help=_("reach the computers away from home: sets up Tailscale "
-                                  "(asks for the administrator password)")).set_defaults(func=cmd_away)
+    away = sub.add_parser("away", help=_("reach the computers away from home: sets up Tailscale "
+                                         "(asks for the administrator password)"))
+    away.add_argument("state", nargs="?", choices=("on", "off"), help=_("off: turns Tailscale off"))
+    away.set_defaults(func=cmd_away)
     rename = sub.add_parser("rename", help=_("rename this computer on the network"))
     rename.add_argument("name")
     rename.set_defaults(func=cmd_rename)

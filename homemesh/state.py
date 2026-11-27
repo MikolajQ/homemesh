@@ -99,6 +99,13 @@ def own_card(st, bump=False):
     return card
 
 
+def forget_vpn(st):
+    """After the VPN was turned off on purpose: its address off the card now,
+    not after the 180 days a VPN that is down keeps it (vpn.remember)."""
+    st["self"].pop("vpn", None)
+    return own_card(st)
+
+
 def _home_ok(value):
     return (isinstance(value, str) and value.startswith("/") and len(value) < 1024
             and not any(ord(ch) < 32 or ch in '"\\' for ch in value))

@@ -5,6 +5,10 @@ boot with whatever init system the computer has, and makes the person its
 operator. Logging in then runs as the person: `tailscale up` prints the
 address of a login page, which opens in their browser, and returns once they
 have logged in. Tailscale itself keeps the computer connected from then on.
+
+Turning it off is `tailscale down`, also as the person: Tailscale stays
+installed and logged in, but off, also after a restart, until `tailscale up`
+turns it back on without logging in again.
 """
 
 import json
@@ -145,6 +149,42 @@ class Setup:
             if found or time.monotonic() > deadline or self.cancelled:
                 return found
             time.sleep(0.5)
+
+
+def _run(tool, *args):
+    try:
+        done = subprocess.run([tool, *args], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                              timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 1, str(error)
+    return done.returncode, done.stdout + done.stderr
+
+
+def _tailscale_up():
+    return any(item["kind"] == "Tailscale" for item in vpn.addresses())
+
+
+def turn_off(run_helper):
+    """Tailscale off on this computer: None, or what went wrong. Blocks, so
+    call it in a thread. run_helper as for Setup: it is needed only when this
+    person is not Tailscale's operator (Tailscale set up without HomeMesh).
+    """
+    tool = cli()
+    if not tool or backend_state() in ("missing", "down", "Stopped"):
+        return None  # nothing is on
+    code, output = _run(tool, "down")
+    if code and _denied(output):
+        result = run_helper(["tailscale"])
+        if not result.ok:
+            return result.error or _("Not everything worked")
+        code, output = _run(tool, "down")
+    if code:
+        return _first_line(output) or _("Tailscale did not turn off.")
+    # Until its address is gone, the card would keep it (vpn.remember).
+    deadline = time.monotonic() + ADDRESS_WAIT
+    while _tailscale_up() and time.monotonic() < deadline:
+        time.sleep(0.2)
+    return None
 
 
 def approval_page(url):

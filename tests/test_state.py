@@ -33,6 +33,21 @@ class CardTest(HomeTestCase):
         self.assertEqual([item["addr"] for item in other["vpn"]], ["127.0.0.2"])
         self.assertGreater(other["updated"], up["updated"])
 
+    def test_a_vpn_turned_off_leaves_the_card_at_once(self):
+        os.environ["HOMEMESH_TEST_VPN"] = "127.0.0.1"
+        with state.transaction() as st:
+            up = state.own_card(st)
+        with state.transaction() as st:
+            self.assertEqual(state.forget_vpn(st), up)  # still up: it stays
+        os.environ["HOMEMESH_TEST_VPN"] = ""
+        with state.transaction() as st:
+            off = state.forget_vpn(st)
+        self.assertNotIn("vpn", off)
+        self.assertNotIn("vpn", state.load()["self"])
+        self.assertGreater(off["updated"], up["updated"])  # so that the group takes it
+        with state.transaction() as st:
+            self.assertEqual(state.own_card(st), off)
+
     def test_state_survives_reload(self):
         with state.transaction() as st:
             pid = st["id"]

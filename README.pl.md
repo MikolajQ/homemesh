@@ -105,7 +105,8 @@ dobrze. HomeMesh nie ma własnego; sam wykrywa Tailscale, NetBird, ZeroTier,
 Yggdrasil, Nebula i WireGuard.
 
 Najprościej z Tailscale (darmowy do użytku domowego), a HomeMesh ustawia go
-sam: w sekcji *Poza domem* kliknij **Ustaw…**, a potem **Ustaw Tailscale**.
+sam: w sekcji *Poza domem* włącz przełącznik, a potem kliknij **Ustaw
+Tailscale**.
 Po podaniu hasła administratora:
 - instaluje Tailscale systemowym menedżerem pakietów (pacman, apt, dnf,
   zypper, xbps albo apk), a jeśli dystrybucja nie ma pakietu, oficjalną
@@ -124,6 +125,13 @@ chwili każde połączenie najpierw sprawdza sieć lokalną (w domu około 40 ms
 domem sprawdzenie rezygnuje po mniej więcej sekundzie), a VPN-u używa tylko
 wtedy, gdy drugiego komputera w niej nie ma. Poza domem pliki płyną przez łącze
 internetowe domu, więc duże pliki idą wolniej niż w domu.
+
+Tym samym przełącznikiem wyłączysz Tailscale na tym komputerze (`homemesh away
+off`). Połączone komputery dotrą do niego wtedy tylko w sieci lokalnej, a jego
+adres VPN od razu znika z jego karty, zamiast zostać na niej jak przy VPN-ie
+wyłączonym na chwilę. Tailscale zostaje zainstalowany i zalogowany, więc
+ponowne włączenie trwa sekundę i nie wymaga logowania. VPN, który prowadzisz
+sam, zostaje włączony: wyłącz go tam, gdzie go ustawiono.
 
 VPN pomaga także w domu, w którym [sieć lokalna się
 zrywa](docs/local-network.pl.md): po drugim zerwaniu w ciągu trzech dni SSH
@@ -158,6 +166,7 @@ próbuje najpierw VPN-u.
     homemesh autostart on|off
     homemesh rename NAZWA    # zmień nazwę tego komputera w sieci
     homemesh away            # ustaw Tailscale do dostępu spoza domu
+    homemesh away off        # wyłącz Tailscale z powrotem
     homemesh reset           # opuść grupę i usuń ustawienia HomeMesh
 
 ## Jak to działa
@@ -205,7 +214,8 @@ adresy VPN). Przy każdym kontakcie (otwarte okno, logowanie, parowanie, nowy
 adres VPN) członkowie wymieniają się tym, co wiedzą, przez `ssh … homemesh
 sync-serve`. Wygrywa nowsza karta, a usunięcie zostawia datowany ślad, więc też
 się rozchodzi. Adresy VPN zostają na karcie, gdy VPN nie działa (Tailscale łączy
-się chwilę po zalogowaniu), dopóki nie milczy przez pół roku.
+się chwilę po zalogowaniu), dopóki nie milczy przez pół roku albo nie zostanie
+wyłączony w HomeMesh.
 
 **Po zalogowaniu**: krótkie zadanie z autostartu (do wyłączenia) uzgadnia grupę
 i montuje komputery oznaczone *Podłączaj po zalogowaniu*, po czym się kończy.
@@ -235,7 +245,7 @@ zrywa](docs/local-network.pl.md); komputery mówią o tym sobie nawzajem.
 
 ## Stan
 
-Wersja 0.6: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
+Wersja 0.7: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
 z GNOME, KDE Plasma i LXQt. Oznaczanie wyłączonych komputerów sprawdzone z
 pcmanfm-qt; obsługa Dolphina, instalowanie pakietów poza Archem i systemy bez
 systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
@@ -248,7 +258,7 @@ systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 
 ## Dla programistów
 
-    make test                            # 142 testy, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 148 testów, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 
