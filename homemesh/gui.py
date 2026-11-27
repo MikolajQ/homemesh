@@ -728,7 +728,7 @@ class PeerRow(Gtk.ListBoxRow):
         texts = vbox(2, self.title, self.subtitle)
         texts.set_hexpand(True)
         open_button = button(_("Open"), lambda: window.open_peer(pid))
-        shell_button = button(_("Terminal"), lambda: window.open_terminal(pid))
+        self.shell_button = shell_button = button(_("Terminal"), lambda: window.open_terminal(pid))
         shell_button.set_tooltip_text(_("A command line on {name}").format(name=peer["name"]))
         shell_button.set_visible(terminal.offered(peer))
 
@@ -750,7 +750,9 @@ class PeerRow(Gtk.ListBoxRow):
         """how: "checking", "lan" (or True), "vpn", or None when out of reach."""
         for css in ("dot-on", "dot-off"):
             self.dot.remove_css_class(css)
-        self.dot.add_css_class("dot-on" if how in ("lan", "vpn", True) else "dot-off")
+        reachable = how in ("lan", "vpn", True)
+        self.dot.add_css_class("dot-on" if reachable else "dot-off")
+        self.shell_button.set_sensitive(reachable)
         if how == "checking":
             status = _("checking…")
         elif how and breaks.breaking(self.peer):
