@@ -24,7 +24,8 @@ sha256sums=('SKIP')
 
 check() {
   cd "$pkgname-$pkgver"
-  python -m unittest discover -s tests -q
+  # Without real pairing between sshd instances: that is tested before each release.
+  HOMEMESH_QUICK_TESTS=1 python -m unittest discover -s tests -q
 }
 
 package() {

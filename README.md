@@ -247,9 +247,12 @@ real. Reports are welcome.
 
 ## Development
 
-    make test                            # 159 tests; the integration tests run private sshd instances
+    make test                            # 142 tests, before a release; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
+
+Building the package runs only the quick tests (`HOMEMESH_QUICK_TESTS=1`,
+a few seconds): no sshd instances, no real pairing, nothing on the network.
 
 ## Translations
 

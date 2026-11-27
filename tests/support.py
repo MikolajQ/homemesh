@@ -15,6 +15,10 @@ os.environ["LANGUAGE"] = "en"
 
 KEY_PREFIX = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI"
 
+# Tests that take long or go out to the real network: for before a release
+# (make test), not for every package build (check() in the PKGBUILD sets this).
+before_release = unittest.skipIf(os.environ.get("HOMEMESH_QUICK_TESTS"), "run before a release: make test")
+
 
 def fake_key(char):
     return KEY_PREFIX + char * 43

@@ -96,7 +96,10 @@ esac
 """
 
 
-class HelperTest(unittest.TestCase):
+class HelperCase(unittest.TestCase):
+    """A fake root and stand-in commands. Only the classes below hold tests,
+    or each subclass would run them all once more."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="homemesh-helper-"))
         self.root = self.tmp / "root"
@@ -133,6 +136,8 @@ class HelperTest(unittest.TestCase):
     def calls(self):
         return self.log.read_text()
 
+
+class HelperTest(HelperCase):
     def test_enable_then_disable(self):
         code, steps = self.run_helper("enable")
         self.assertEqual(code, 0, steps)
@@ -193,7 +198,7 @@ class HelperTest(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
 
 
-class MdnsTest(HelperTest):
+class MdnsTest(HelperCase):
     """name.local when systemd-resolved has mDNS off at first."""
 
     def setUp(self):
@@ -320,7 +325,7 @@ done
 """
 
 
-class PackagesTest(HelperTest):
+class PackagesTest(HelperCase):
     """Missing packages: named without --install, installed with it."""
 
     def setUp(self):
@@ -421,7 +426,7 @@ class PackagesTest(HelperTest):
         self.assertEqual(self.installs(), [])
 
 
-class TailscaleTest(HelperTest):
+class TailscaleTest(HelperCase):
     """homemesh-helper tailscale: install, a service for any init system, the operator."""
 
     def setUp(self):
@@ -527,7 +532,7 @@ class TailscaleTest(HelperTest):
                 pass
 
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Handler, directory=str(site)))
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         return f"http://127.0.0.1:{server.server_address[1]}/"

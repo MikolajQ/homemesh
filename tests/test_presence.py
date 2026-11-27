@@ -75,8 +75,8 @@ class AskTest(HomeTestCase):
                     sock.sendto(answer, where)
         threading.Thread(target=serve, daemon=True).start()
 
-    def ask(self):
-        return presence.ask("a" * 32, "b" * 32, "127.0.0.1", tries=(0.2, 0.2))
+    def ask(self, tries=(0.2, 0.2)):
+        return presence.ask("a" * 32, "b" * 32, "127.0.0.1", tries=tries)
 
     def test_answers(self):
         for ready in (True, False):
@@ -85,11 +85,11 @@ class AskTest(HomeTestCase):
 
     def test_an_answer_to_another_question_does_not_count(self):
         self.answering(lambda note: presence.pong({**note, "n": "stale"}, True))
-        self.assertIsNone(self.ask())
+        self.assertIsNone(self.ask(tries=(0.05,)))
 
     def test_another_computer_at_that_address_does_not_count(self):
         self.answering(lambda note: presence.pong({**note, "to": "c" * 32}, True))
-        self.assertIsNone(self.ask())
+        self.assertIsNone(self.ask(tries=(0.05,)))
 
     def test_nobody_listening_is_noticed_at_once(self):
         os.environ["HOMEMESH_PORT"] = str(free_udp_port())

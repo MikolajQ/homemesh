@@ -17,7 +17,7 @@ import time
 import unittest
 from pathlib import Path
 
-from support import ROOT, make_host_key
+from support import ROOT, before_release, make_host_key
 
 SSHD = "/usr/bin/sshd" if os.path.exists("/usr/bin/sshd") else "/usr/sbin/sshd"
 
@@ -121,6 +121,7 @@ class Computer:
         self.sshd.wait(5)
 
 
+@before_release
 @unittest.skipUnless(os.path.exists(SSHD) and shutil.which("ssh"), "needs OpenSSH")
 class GroupTest(unittest.TestCase):
     @classmethod
@@ -192,6 +193,7 @@ class GroupTest(unittest.TestCase):
         self.assertIn(f"sftp://beta.local{beta.home} beta", bookmarks)
 
 
+@before_release
 @unittest.skipUnless(os.path.exists(SSHD) and shutil.which("ssh"), "needs OpenSSH")
 class AwayTest(unittest.TestCase):
     """beta is "away": its local address does not answer, its VPN address does."""
@@ -234,6 +236,7 @@ class AwayTest(unittest.TestCase):
         self.assertIn("Away from home: not reachable", self.beta.run("status").stdout)  # which is true now
 
 
+@before_release
 @unittest.skipUnless(os.path.exists(SSHD) and shutil.which("ssh"), "needs OpenSSH")
 class MarksTest(unittest.TestCase):
     """Two computers with the watcher running; one is turned off and on again."""

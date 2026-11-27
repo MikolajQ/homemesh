@@ -7,7 +7,7 @@ import sys
 import time
 import unittest
 
-from support import ROOT, HomeTestCase, card
+from support import ROOT, HomeTestCase, before_release, card
 
 from homemesh import paths, render, state, vpn
 
@@ -138,11 +138,14 @@ class RouteTest(unittest.TestCase):
         with listening_port() as server:
             self.assertEqual(self.route("127.0.0.1", server.getsockname()[1])[0], 0)
 
-    def test_closed_port_or_unknown_name_is_away_quickly(self):
+    def test_closed_port_is_away(self):
         with listening_port() as server:
             port = server.getsockname()[1]
         code, took = self.route("127.0.0.1", port)
         self.assertEqual(code, 1)
+
+    @before_release  # asks the local network
+    def test_unknown_name_is_away_quickly(self):
         code, took = self.route("nie-ma-takiego-komputera.local", 22)
         self.assertEqual(code, 1)
         self.assertLess(took, 3)
