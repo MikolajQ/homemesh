@@ -53,6 +53,18 @@ class FolderModeTest(HomeTestCase):
         self.assertFalse(share.allows_commands(share.current(folders)))
         self.assertTrue(share.allows_commands(share.current(state.new_state())))
 
+    def test_a_card_seen_by_an_older_version_gets_its_new_fields(self):
+        """0.7 dropped "shell" from a 0.8 card; after the upgrade the same card
+        (same time) must still bring it in, and an identical one change nothing."""
+        with state.transaction() as st:
+            state.merge(st, [card("b", "beta", 10)], {}, via="direct")
+            self.assertFalse(state.merge(st, [card("b", "beta", 10)], {}, via="x"))
+            self.assertTrue(state.merge(st, [dict(card("b", "beta", 10), shell=False)], {}, via="x"))
+            self.assertIs(st["peers"]["b" * 32]["shell"], False)
+            self.assertEqual(st["peers"]["b" * 32]["via"], "direct")
+            self.assertFalse(state.merge(st, [dict(card("b", "beta", 9), shell=True)], {}, via="x"))
+            self.assertIs(st["peers"]["b" * 32]["shell"], False)
+
     def test_the_card_says_whether_the_terminal_is_allowed(self):
         with state.transaction() as st:
             first = state.own_card(st)

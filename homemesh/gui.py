@@ -728,10 +728,9 @@ class PeerRow(Gtk.ListBoxRow):
         texts = vbox(2, self.title, self.subtitle)
         texts.set_hexpand(True)
         open_button = button(_("Open"), lambda: window.open_peer(pid))
-        # Only where the other computer allows it; its card says so.
         shell_button = button(_("Terminal"), lambda: window.open_terminal(pid))
         shell_button.set_tooltip_text(_("A command line on {name}").format(name=peer["name"]))
-        shell_button.set_visible(peer.get("shell") is True)
+        shell_button.set_visible(terminal.offered(peer))
 
         menu = Gtk.MenuButton(icon_name="view-more-symbolic", valign=Gtk.Align.CENTER,
                               tooltip_text=_("More"))

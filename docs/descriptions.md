@@ -106,7 +106,7 @@ Presence is a unicast UDP ping a minute between paired computers,
 answered to them only; a session process keeps the “(off)” marks in the GTK
 bookmarks and KDE's places and ends with the Wayland or X11 display. A root
 helper behind polkit configures sshd (keys only), the firewall and mDNS, and
-installs missing packages. 158 tests, including simulated computers with
+installs missing packages. 160 tests, including simulated computers with
 private sshd instances.
 
 ### Keywords
@@ -213,7 +213,7 @@ najpierw VPN-u. Obecność to jedno zapytanie UDP na minutę, wprost na
 adres połączonego komputera; odpowiedź dostają tylko połączone. Proces w sesji
 utrzymuje dopiski „(off)” w zakładkach GTK i miejscach KDE i kończy się razem z
 Waylandem albo X11. Pomocnik z uprawnieniami roota za polkit ustawia sshd
-(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 158 testów, w
+(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 160 testów, w
 tym symulowane komputery z prywatnymi instancjami sshd.
 
 ### Słowa kluczowe

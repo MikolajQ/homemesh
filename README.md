@@ -164,8 +164,9 @@ Port, agent and X11 forwarding are off for paired keys in every mode
 The *Terminal* button runs `ssh` with HomeMesh's own configuration in
 `xdg-terminal-exec` when it is installed, otherwise in the terminal set in
 Plasma, `$TERMINAL`, the desktop's own terminal or a common one (Ptyxis, GNOME
-Console, Konsole, xfce4-terminal, kitty, foot, Alacritty, xterm…). It shows
-only for computers that allow it; their card says so.
+Console, Konsole, xfce4-terminal, kitty, foot, Alacritty, xterm…). It hides
+for computers where the terminal is turned off; HomeMesh before 0.8 has no
+such setting and allows commands with the whole home folder shared.
 
 ## Command line
 
@@ -277,12 +278,14 @@ real. Reports are welcome.
 
 ## Development
 
-    make test                            # 158 tests, before a release; the integration tests run private sshd instances
+    make test                            # 160 tests, before a release; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 
-Building the package runs only the quick tests (`HOMEMESH_QUICK_TESTS=1`,
-a few seconds): no sshd instances, no real pairing, nothing on the network.
+Installing from the AUR only checks that the modules load on your Python, in
+a fraction of a second; the tests run here before every release.
+`build-local.sh` runs the quick tests (`HOMEMESH_QUICK_TESTS=1`, a few
+seconds): no sshd instances, no real pairing, nothing on the network.
 
 ## Translations
 

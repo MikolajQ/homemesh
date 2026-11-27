@@ -185,7 +185,11 @@ def merge(st, cards, removed, via):
         if pid == me or st["removed"].get(pid, 0) >= card["updated"]:
             continue
         current = st["peers"].get(pid)
-        if current and current["updated"] >= card["updated"]:
+        if current and current["updated"] > card["updated"]:
+            continue
+        # The same card again, unless it now has fields that an older version
+        # of HomeMesh here dropped when it first came ("shell" before 0.8).
+        if current and current["updated"] == card["updated"] and not set(card) - set(current):
             continue
         peer = dict(card)
         peer["via"] = current["via"] if current else via

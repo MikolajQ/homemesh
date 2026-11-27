@@ -67,13 +67,18 @@ class TerminalTest(HomeTestCase):
         fake_ssh.chmod(0o755)
         command = terminal.ssh_command("beta.local")
         self.assertIn(str(paths.ssh_config()), command)
-        for status, waits in ((0, False), (1, False), (255, True), (share.REFUSED, True)):
+        for status, waits in ((0, False), (1, True), (255, True), (share.REFUSED, True)):
             done = subprocess.run(["/bin/sh", *command[1:]] if command[0] == "sh" else command,
                                   env=dict(os.environ, SSH_STATUS=str(status)), input="\n",
                                   capture_output=True, text=True, timeout=10)
             self.assertEqual(done.returncode, status)
             self.assertIn(f"-F {paths.ssh_config()} beta.local", done.stdout)
             self.assertEqual("Press Enter" in done.stdout, waits, status)
+
+    def test_button_hides_only_where_turned_off(self):
+        self.assertTrue(terminal.offered({"name": "beta", "shell": True}))
+        self.assertTrue(terminal.offered({"name": "old", "version": "0.3.0"}))
+        self.assertFalse(terminal.offered({"name": "beta", "shell": False}))
 
     def test_whole_line(self):
         self.install("konsole")

@@ -164,8 +164,9 @@ Przycisk *Terminal* uruchamia `ssh` z konfiguracją HomeMesh w
 `xdg-terminal-exec`, jeśli jest zainstalowany, a inaczej w terminalu
 ustawionym w Plasmie, w `$TERMINAL`, we własnym terminalu pulpitu albo w
 jednym z popularnych (Ptyxis, Konsola GNOME, Konsole, xfce4-terminal, kitty,
-foot, Alacritty, xterm…). Pokazuje się tylko przy komputerach, które na to
-pozwalają; mówi o tym ich karta.
+foot, Alacritty, xterm…). Znika przy komputerach z wyłączonym terminalem;
+HomeMesh sprzed 0.8 nie ma tego ustawienia i przy całym katalogu domowym
+pozwala na polecenia.
 
 ## W terminalu
 
@@ -280,12 +281,14 @@ systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 
 ## Dla programistów
 
-    make test                            # 158 testów, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 160 testów, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 
-Budowanie pakietu uruchamia tylko szybkie testy (`HOMEMESH_QUICK_TESTS=1`,
-kilka sekund): bez instancji sshd, bez prawdziwego parowania, nic w sieci.
+Instalacja z AUR sprawdza tylko, czy moduły ładują się w twoim Pythonie, co
+trwa ułamek sekundy; testy przechodzą tutaj przed każdym wydaniem.
+`build-local.sh` uruchamia szybkie testy (`HOMEMESH_QUICK_TESTS=1`, kilka
+sekund): bez instancji sshd, bez prawdziwego parowania, nic w sieci.
 
 ## Tłumaczenia
 

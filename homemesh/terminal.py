@@ -112,10 +112,23 @@ def wrap(terminal, command):
     return terminal + extra + command
 
 
+def offered(peer):
+    """Show the Terminal button for this peer? Not where it was turned off.
+    Its card says so from 0.8 on; older versions have no such setting and
+    allow commands with the whole home folder shared."""
+    return peer.get("shell") is not False
+
+
 def ssh_command(alias):
-    """ssh to a peer; on failure, wait for Enter so the message can be read."""
-    script = ('ssh -F "$1" "$2"; status=$?; '
-              f'if [ $status -eq 255 ] || [ $status -eq {share.REFUSED} ]; then '
+    """ssh to a peer; on failure, wait for Enter so the message can be read.
+
+    Failure: ssh's own (255), HomeMesh refusing the command (126), or any
+    error within the first seconds, which is how a version before 0.8 says
+    no. A long session that ends with an error closes as usual.
+    """
+    script = ('start=$(date +%s); ssh -F "$1" "$2"; status=$?; '
+              f'if [ $status -eq 255 ] || [ $status -eq {share.REFUSED} ] || '
+              '{ [ $status -ne 0 ] && [ $(($(date +%s) - start)) -lt 5 ]; }; then '
               'printf "\\n%s " "$3"; read -r _; fi; exit $status')
     return ["sh", "-c", script, "homemesh", str(paths.ssh_config()), alias,
             _("Press Enter to close this window.")]
