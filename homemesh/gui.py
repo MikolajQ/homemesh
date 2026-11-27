@@ -485,7 +485,9 @@ class ShareDialog(Dialog):
             self.content(install)
         self.add_button(_("Cancel"), self.close)
         self.save = self.add_button(_("Save"), self._save, "suggested-action")
-        self.home.connect("toggled", lambda *_a: self._update())
+        # Not the other one: of the pair, GTK reports the one switched off first,
+        # while the one switched on still reads as off.
+        self.chosen.connect("toggled", lambda *_a: self._update())
         self._rebuild()
 
     def _rebuild(self):
