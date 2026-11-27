@@ -94,14 +94,15 @@ def known_hosts_text(st, names):
 def key_options(st, peer):
     """From the local network, or from this peer's own VPN addresses.
 
-    Whole home: the peer's key works like your own. Chosen folders: only
-    SFTP inside the sandbox (and group syncing), no shell, no forwarding.
+    Never any forwarding (ports, agent, X11): `restrict`. Whole home with
+    the terminal: commands and a terminal (`pty`). Otherwise the gate: SFTP
+    (inside the sandbox for chosen folders) and group syncing, nothing else.
     """
     sources = LAN_NETS + ("127.0.0.0/8",) + tuple(item["addr"] for item in peer.get("vpn") or [])
-    options = 'from="' + ",".join(sources) + '"'
-    if share.current(st)["mode"] == "folders":
-        options += f',restrict,command="{share.gate_command()}"'
-    return options
+    options = 'from="' + ",".join(sources) + '",restrict'
+    if share.allows_commands(share.current(st)):
+        return options + ",pty"
+    return options + f',command="{share.gate_command()}"'
 
 
 def authorized_keys_text(st, current):

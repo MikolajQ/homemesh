@@ -1,8 +1,11 @@
 """What the paired computers may see on this one.
 
-"home"     The whole home folder, with the same rights as your own account
-           (that includes running commands: whoever can write to ~ could do
-           that anyway, through ~/.bashrc or autostart).
+"home"     The whole home folder, with the same rights as your own account.
+           "shell" (on by default) lets the paired computers run commands
+           too, a terminal included. Off, their keys go through the gate,
+           which serves SFTP and group syncing only; that stops casual use,
+           not a determined one: whoever can write to ~ can still plant a
+           command in ~/.bashrc or autostart.
 "folders"  Only chosen folders, each read-write or read-only. The keys of
            paired computers then go through `homemesh gate`, which serves
            SFTP from a bubblewrap sandbox holding just those folders, placed
@@ -26,8 +29,13 @@ SFTP_SERVERS = ("/usr/lib/ssh/sftp-server", "/usr/lib/openssh/sftp-server",
                 "/usr/libexec/openssh/sftp-server", "/usr/libexec/sftp-server")
 
 
+# Exit status of a refused command: the terminal window keeps the message
+# open on it (terminal.py), where an ordinary 1 could be the shell's own.
+REFUSED = 126
+
+
 def default():
-    return {"mode": "home", "folders": []}
+    return {"mode": "home", "folders": [], "shell": True}
 
 
 def current(st):
@@ -37,7 +45,12 @@ def current(st):
     folders = [{"path": f["path"], "readonly": bool(f.get("readonly"))}
                for f in share.get("folders", [])
                if isinstance(f, dict) and isinstance(f.get("path"), str) and f["path"].startswith("/")]
-    return {"mode": share["mode"], "folders": folders}
+    return {"mode": share["mode"], "folders": folders, "shell": share.get("shell", True) is not False}
+
+
+def allows_commands(share):
+    """May paired computers run commands here (a terminal, scripts)?"""
+    return share["mode"] == "home" and share["shell"]
 
 
 def sftp_server():
@@ -118,7 +131,7 @@ def sandbox_command(share, home, server, files=None):
 
 
 def gate_command():
-    """What authorized_keys runs for paired computers in the "folders" mode."""
+    """What authorized_keys runs for paired computers when commands are off."""
     override = os.environ.get("HOMEMESH_GATE")
     if override:
         return override
@@ -134,7 +147,8 @@ def is_sftp(command):
 
 
 def gate():
-    """Run by sshd for a paired computer's key when only some folders are shared."""
+    """Run by sshd for a paired computer's key when commands are off: only
+    some folders are shared, or the whole home folder without the terminal."""
     original = os.environ.get("SSH_ORIGINAL_COMMAND", "").strip()
     if original == "homemesh sync-serve":
         from . import sync
@@ -153,13 +167,19 @@ def gate():
         files = {path: _pipe_with(text) for path, text in account_files().items()}
         command = sandbox_command(share, paths.home(), server, files)
         os.execvp(command[0], command)
-    sys.stderr.write(_("HomeMesh: this computer shares only chosen folders, over SFTP.\n"))
-    return 1
+    if current(state.load())["mode"] == "home":
+        sys.stderr.write(_("HomeMesh: this computer shares files only; the terminal is off "
+                           "in its HomeMesh settings.\n"))
+    else:
+        sys.stderr.write(_("HomeMesh: this computer shares only chosen folders, over SFTP.\n"))
+    return REFUSED
 
 
 def summary(share):
     if share["mode"] == "home":
-        return _("The whole home folder")
+        if share["shell"]:
+            return _("The whole home folder, and running commands (terminal)")
+        return _("The whole home folder, files only (no terminal)")
     if not share["folders"]:
         return _("Nothing (no folder chosen)")
     parts = []

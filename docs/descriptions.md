@@ -64,6 +64,9 @@ sandbox. Whatever is missing is installed with one button.
 - **Choose what to share**: the whole home folder, or chosen folders, each
   read-write or read-only, served by sftp-server in a bubblewrap sandbox
   with no shell and no access to anything else.
+- **A terminal on the other computer**: one click logs in to it in your own
+  terminal program. On by default with the whole home folder, under a red
+  warning with *Turn off* right in the window.
 - **Away from home**: sets up Tailscale with one click (install, service and
   login, no commands, with or without systemd) and also works with NetBird,
   ZeroTier, Yggdrasil, Nebula or WireGuard; each connection uses the local
@@ -90,7 +93,9 @@ HomeMesh is a small Python/GTK 4 app around OpenSSH. Pairing uses a
 commit-then-reveal exchange like Bluetooth's numeric comparison, so a
 man in the middle has a one-in-a-million chance of matching codes. Keys are
 written with `from=` limited to private addresses and the peer's VPN
-addresses; host keys are pinned with `HostKeyAlias`. Members gossip their
+addresses and `restrict` (no forwarding), plus `pty` when commands are
+allowed or a forced `homemesh gate` (SFTP and syncing only) when they are
+not; host keys are pinned with `HostKeyAlias`. Members gossip their
 cards (keys, home folder, VPN addresses) over `ssh … homemesh sync-serve`,
 with newest-wins merging and dated tombstones. Away from home, a
 `Match originalhost … !exec` block falls back to the VPN address when a
@@ -101,7 +106,7 @@ Presence is a unicast UDP ping a minute between paired computers,
 answered to them only; a session process keeps the “(off)” marks in the GTK
 bookmarks and KDE's places and ends with the Wayland or X11 display. A root
 helper behind polkit configures sshd (keys only), the firewall and mDNS, and
-installs missing packages. 142 tests, including simulated computers with
+installs missing packages. 158 tests, including simulated computers with
 private sshd instances.
 
 ### Keywords
@@ -165,6 +170,9 @@ do odczytu, podawane z piaskownicy. Czego brakuje, instaluje jeden przycisk.
 - **Wybierasz, co udostępniasz**: cały katalog domowy albo wybrane foldery,
   każdy do zapisu lub tylko do odczytu, podawane przez sftp-server w
   piaskownicy bubblewrap, bez powłoki i bez dostępu do czegokolwiek innego.
+- **Terminal na drugim komputerze**: jedno kliknięcie loguje do niego w twoim
+  programie terminala. Domyślnie włączony przy całym katalogu domowym, pod
+  czerwonym ostrzeżeniem z przyciskiem *Wyłącz* w oknie.
 - **Poza domem**: ustawia Tailscale jednym kliknięciem (instalacja, usługa i
   logowanie, bez poleceń, z systemd i bez niego), działa też z NetBird,
   ZeroTier, Yggdrasil, Nebula albo WireGuard; każde połączenie idzie przez
@@ -191,8 +199,10 @@ HomeMesh to mała aplikacja w Pythonie i GTK 4 wokół OpenSSH. Parowanie
 korzysta z wymiany „zobowiąż się, potem ujawnij”, jak porównanie liczb w
 Bluetooth, więc atakujący pośrodku ma jedną szansę na milion na zgodne kody.
 Klucze trafiają do authorized_keys z `from=` ograniczonym do adresów
-prywatnych i adresów VPN danego komputera; klucze hostów są przypięte przez
-`HostKeyAlias`. Członkowie wymieniają się kartami (klucze, katalog domowy,
+prywatnych i adresów VPN danego komputera oraz z `restrict` (bez
+przekierowań), do tego `pty`, gdy polecenia są dozwolone, albo wymuszone
+`homemesh gate` (tylko SFTP i synchronizacja), gdy nie są; klucze hostów są
+przypięte przez `HostKeyAlias`. Członkowie wymieniają się kartami (klucze, katalog domowy,
 adresy VPN) przez `ssh … homemesh sync-serve`; wygrywa nowsza karta, a
 usunięcia zostawiają datowane ślady. Poza domem blok
 `Match originalhost … !exec` przełącza na adres VPN, gdy szybkie sprawdzenie
@@ -203,7 +213,7 @@ najpierw VPN-u. Obecność to jedno zapytanie UDP na minutę, wprost na
 adres połączonego komputera; odpowiedź dostają tylko połączone. Proces w sesji
 utrzymuje dopiski „(off)” w zakładkach GTK i miejscach KDE i kończy się razem z
 Waylandem albo X11. Pomocnik z uprawnieniami roota za polkit ustawia sshd
-(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 142 testy, w
+(tylko klucze), zaporę i mDNS oraz instaluje brakujące pakiety. 158 testów, w
 tym symulowane komputery z prywatnymi instancjami sshd.
 
 ### Słowa kluczowe

@@ -13,7 +13,7 @@ SSH/SFTP, które ma każdy Linux.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/overview-dark.png">
-  <img alt="Okno HomeMesh: ten komputer z przełącznikiem udostępniania, co widzą inne komputery, dostęp spoza domu i zadania po zalogowaniu; połączone komputery z ich stanem; komputer w pobliżu gotowy do połączenia" src="docs/screenshots/pl/overview-light.png" width="544">
+  <img alt="Okno HomeMesh: ten komputer z przełącznikiem udostępniania, co widzą inne komputery z czerwonym ostrzeżeniem, że połączone komputery mogą tu uruchamiać polecenia, i przyciskiem Wyłącz, dostęp spoza domu i zadania po zalogowaniu; połączone komputery z ich stanem i przyciskami Terminal i Otwórz; komputer w pobliżu gotowy do połączenia" src="docs/screenshots/pl/overview-light.png" width="544">
 </picture>
 
 ## W skrócie
@@ -25,6 +25,7 @@ SSH/SFTP, które ma każdy Linux.
 | **Przedstawianie** | Nowy komputer wystarczy połączyć z dowolnym członkiem grupy, a pozna wszystkich; ci, których nie spotkał, dowiedzą się o nim przy najbliższym kontakcie. Usunięcie komputera rozchodzi się tak samo. |
 | **Twój menedżer plików** | Połączone komputery są zakładkami w menedżerach GTK (GVfs) i w Dolphinie (KIO). Kliknięcie montuje; opcjonalnie montują się po zalogowaniu. Wyłączony komputer ma dopisek: *(off) laptop*. |
 | **Wybierasz, co udostępniasz** | Cały katalog domowy albo tylko wybrane foldery, każdy do odczytu i zapisu albo tylko do odczytu. Wybrane foldery idą z piaskownicy: reszty katalogu domowego, kluczy i systemu po prostu tam nie ma. |
+| **Terminal na drugim komputerze** | *Terminal* obok *Otwórz* loguje do tamtego komputera w twoim programie terminala, w domu albo przez VPN. Domyślnie włączony przy całym katalogu domowym, pod czerwonym ostrzeżeniem z przyciskiem *Wyłącz* w oknie. |
 | **Poza domem** | Jedno kliknięcie ustawia Tailscale: HomeMesh go instaluje, uruchamia i otwiera stronę logowania, bez żadnych poleceń. Masz już NetBird, ZeroTier, Yggdrasil, Nebula albo WireGuard? Wykryje je sam. Połączenie idzie przez sieć lokalną, gdy się da, a w przeciwnym razie przez VPN; zakładki zostają te same. |
 | **Radzi sobie z niestabilną siecią** | Gdy sieć lokalna gubi drogę między dwoma komputerami (na przykład mesh Wi-Fi, który z opóźnieniem zauważa, że laptop się przeniósł), połączenia idą najpierw przez VPN, dopóki nie będzie spokoju przez trzy dni: w domu mniej więcej tak samo szybko, a otwarte foldery zostają otwarte. Okno o tym mówi i podpowiada, [co pomaga](docs/local-network.pl.md). |
 | **Lekki** | GTK 4 bez libadwaita, więc pasuje do każdego pulpitu. Bez demona w systemie: pliki podaje systemowy `sshd`, okno jest potrzebne tylko do znajdowania i łączenia komputerów, a jeden mały proces w twojej sesji oznacza wyłączone. Działa z systemd i bez niego. |
@@ -47,7 +48,7 @@ SSH/SFTP, które ma każdy Linux.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/pl/share-dark.png">
-  <img alt="Okno udostępniania: cały katalog domowy albo tylko wybrane foldery, Publiczny do odczytu i zapisu, Muzyka tylko do odczytu" src="docs/screenshots/pl/share-light.png">
+  <img alt="Okno udostępniania: cały katalog domowy (z opcją terminala) albo tylko wybrane foldery, Publiczny do odczytu i zapisu, Muzyka tylko do odczytu" src="docs/screenshots/pl/share-light.png">
 </picture>
 
 </td>
@@ -141,12 +142,30 @@ próbuje najpierw VPN-u.
 
 - **Cały katalog domowy** (domyślnie): taki dostęp jak twoje konto, łącznie z
   ustawieniami i kluczami. Łącz tylko własne komputery.
+  - **Także uruchamianie poleceń (terminal)**, domyślnie włączone: połączone
+    komputery mogą tu otworzyć terminal (przycisk *Terminal* po ich stronie) i
+    uruchomić dowolny program, tak jak ty. Główne okno mówi o tym na czerwono,
+    z przyciskiem *Wyłącz* obok. Po wyłączeniu zostają same pliki: SFTP i
+    synchronizacja grupy idą przez `homemesh gate`, wszystko inne jest
+    odrzucane. To powstrzyma przypadkowe użycie, ale nie zdeterminowane, bo
+    wystarczy zapis do `~/.bashrc` albo autostartu, żeby podrzucić polecenie;
+    prawdziwą granicę dają wybrane foldery.
 - **Tylko wybrane foldery**, każdy do odczytu i zapisu albo tylko do odczytu.
   Połączone komputery dostają wtedy wyłącznie SFTP: `sftp-server` działa w
   piaskownicy [bubblewrap](https://github.com/containers/bubblewrap), w której
   jest pusty katalog domowy z samymi wybranymi folderami. Nie ma powłoki,
   przekierowań portów, `~/.ssh` ani `/etc` poza jednowierszowym `passwd`.
   Zmiana kończy bieżące połączenia, więc działa od razu.
+
+Przekierowania portów, agenta SSH i X11 są dla kluczy połączonych komputerów
+wyłączone w każdym trybie (`restrict` w `authorized_keys`).
+
+Przycisk *Terminal* uruchamia `ssh` z konfiguracją HomeMesh w
+`xdg-terminal-exec`, jeśli jest zainstalowany, a inaczej w terminalu
+ustawionym w Plasmie, w `$TERMINAL`, we własnym terminalu pulpitu albo w
+jednym z popularnych (Ptyxis, Konsola GNOME, Konsole, xfce4-terminal, kitty,
+foot, Alacritty, xterm…). Pokazuje się tylko przy komputerach, które na to
+pozwalają; mówi o tym ich karta.
 
 ## W terminalu
 
@@ -163,6 +182,7 @@ próbuje najpierw VPN-u.
     homemesh share add ~/Publiczny [--readonly]
     homemesh share remove ~/Publiczny
     homemesh share home      # z powrotem cały katalog domowy
+    homemesh share terminal on|off   # czy połączone komputery mogą tu uruchamiać polecenia
     homemesh autostart on|off
     homemesh rename NAZWA    # zmień nazwę tego komputera w sieci
     homemesh away            # ustaw Tailscale do dostępu spoza domu
@@ -237,7 +257,9 @@ zrywa](docs/local-network.pl.md); komputery mówią o tym sobie nawzajem.
 
 - Przy udostępnionym całym katalogu domowym połączone komputery ufają sobie w
   pełni: prawo zapisu w katalogu domowym jest tyle samo warte co uruchamianie
-  tam programów. Łącz tylko własne komputery albo udostępniaj wybrane foldery.
+  tam programów, a z włączonym terminalem (domyślnie) uruchamiają je wprost.
+  Łącz tylko własne komputery albo udostępniaj wybrane foldery.
+- Klucze połączonych komputerów nie przekierowują portów, agenta SSH ani X11.
 - Klucze działają tylko z adresów prywatnych i z adresów VPN danego komputera.
   `sshd` przestaje przyjmować hasła przez sieć.
 - Parowanie i wykrywanie przyjmują tylko sieć lokalną (oraz adresy
@@ -245,7 +267,7 @@ zrywa](docs/local-network.pl.md); komputery mówią o tym sobie nawzajem.
 
 ## Stan
 
-Wersja 0.7: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
+Wersja 0.8: młoda. Sprawdzona między komputerami z systemami opartymi na Archu,
 z GNOME, KDE Plasma i LXQt. Oznaczanie wyłączonych komputerów sprawdzone z
 pcmanfm-qt; obsługa Dolphina, instalowanie pakietów poza Archem i systemy bez
 systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
@@ -258,7 +280,7 @@ systemd (OpenRC, runit, s6, dinit) są napisane, ale jeszcze nie sprawdzone na
 
 ## Dla programistów
 
-    make test                            # 148 testów, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
+    make test                            # 158 testów, przed wydaniem; integracyjne uruchamiają prywatne instancje sshd
     packaging/arch/build-local.sh        # pakiet z drzewa roboczego
     homemesh --demo --screenshot x.png   # okno z wymyślonymi komputerami
 

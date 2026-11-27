@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: homemesh\n"
 "Report-Msgid-Bugs-To: https://github.com/MikolajQ/homemesh/issues\n"
-"POT-Creation-Date: 2026-11-27 14:44+0100\n"
+"POT-Creation-Date: 2026-11-27 17:58+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -196,16 +196,16 @@ msgstr ""
 msgid "This computer is now called {name} ({name}.local)."
 msgstr ""
 
-#: homemesh/cli.py:47 homemesh/gui.py:929
+#: homemesh/cli.py:47 homemesh/gui.py:970
 msgid "paired directly"
 msgstr ""
 
-#: homemesh/cli.py:50 homemesh/gui.py:931
+#: homemesh/cli.py:50 homemesh/gui.py:972
 #, python-brace-format
 msgid "introduced by {name}"
 msgstr ""
 
-#: homemesh/cli.py:51 homemesh/gui.py:932
+#: homemesh/cli.py:51 homemesh/gui.py:973
 msgid "introduced by another computer"
 msgstr ""
 
@@ -235,463 +235,499 @@ msgstr ""
 msgid ".local names: not working. Fix: homemesh enable"
 msgstr ""
 
-#: homemesh/cli.py:67 homemesh/cli.py:395 homemesh/cli.py:407
+#: homemesh/cli.py:67 homemesh/cli.py:402 homemesh/cli.py:415
 #, python-brace-format
 msgid "Shared: {what}"
 msgstr ""
 
-#: homemesh/cli.py:69 homemesh/cli.py:130 homemesh/cli.py:155
+#: homemesh/cli.py:70 homemesh/cli.py:131 homemesh/cli.py:156
 #, python-brace-format
 msgid "Away from home: through {vpn}"
 msgstr ""
 
-#: homemesh/cli.py:70
+#: homemesh/cli.py:71
 msgid "Away from home: not reachable. Set up Tailscale: homemesh away"
 msgstr ""
 
-#: homemesh/cli.py:71 homemesh/cli.py:441
+#: homemesh/cli.py:72 homemesh/cli.py:460
 msgid ""
 "At login: syncs the group, connects the chosen computers and marks the ones "
 "that are off"
 msgstr ""
 
-#: homemesh/cli.py:72
+#: homemesh/cli.py:73
 msgid "At login: nothing (turn on: homemesh autostart on)"
 msgstr ""
 
-#: homemesh/cli.py:75
+#: homemesh/cli.py:76
 msgid "Paired computers: none. Pair: homemesh pair"
 msgstr ""
 
-#: homemesh/cli.py:77
+#: homemesh/cli.py:78
 msgid "Paired computers:"
 msgstr ""
 
-#: homemesh/cli.py:81 homemesh/gui.py:725
+#: homemesh/cli.py:82 homemesh/gui.py:764
 msgid "not reachable"
 msgstr ""
 
-#: homemesh/cli.py:81
+#: homemesh/cli.py:82
 msgid "on the local network"
 msgstr ""
 
-#: homemesh/cli.py:81
+#: homemesh/cli.py:82
 msgid "through VPN"
 msgstr ""
 
-#: homemesh/cli.py:83 homemesh/gui.py:719
+#: homemesh/cli.py:84 homemesh/gui.py:758
 msgid "through VPN, as the local network keeps breaking"
 msgstr ""
 
-#: homemesh/cli.py:92 homemesh/cli.py:424
+#: homemesh/cli.py:93 homemesh/cli.py:443
 msgid "Install the missing packages? [y/N] "
 msgstr ""
 
-#: homemesh/cli.py:95
+#: homemesh/cli.py:96
 msgid "Sharing is on. Now pair your computers: homemesh pair"
 msgstr ""
 
-#: homemesh/cli.py:99 homemesh/gui.py:1139
+#: homemesh/cli.py:100 homemesh/gui.py:1182
 msgid "Sharing is off."
 msgstr ""
 
-#: homemesh/cli.py:104 homemesh/gui.py:1253
+#: homemesh/cli.py:105 homemesh/gui.py:1302
 #, python-brace-format
 msgid "New name: {name}.local"
 msgstr ""
 
-#: homemesh/cli.py:135
+#: homemesh/cli.py:136
 msgid ""
 "Installing and starting Tailscale (asks for the administrator password)…"
 msgstr ""
 
-#: homemesh/cli.py:137 homemesh/gui.py:376
+#: homemesh/cli.py:138 homemesh/gui.py:397
 msgid "Connecting to Tailscale…"
 msgstr ""
 
-#: homemesh/cli.py:139
+#: homemesh/cli.py:140
 #, python-brace-format
 msgid "Approve this computer in Tailscale's admin page: {url}"
 msgstr ""
 
-#: homemesh/cli.py:142
+#: homemesh/cli.py:143
 #, python-brace-format
 msgid ""
 "Log in to Tailscale in your browser (the same account on all your "
 "computers): {url}"
 msgstr ""
 
-#: homemesh/cli.py:156 homemesh/gui.py:410
+#: homemesh/cli.py:157 homemesh/gui.py:431
 msgid "This computer is connected to Tailscale."
 msgstr ""
 
-#: homemesh/cli.py:157 homemesh/gui.py:412
+#: homemesh/cli.py:158 homemesh/gui.py:433
 msgid ""
 "Now set up Tailscale the same way on your other computers, with the same "
 "account."
 msgstr ""
 
-#: homemesh/cli.py:171
+#: homemesh/cli.py:172
 #, python-brace-format
 msgid "Away from home: still through {vpn}, which HomeMesh does not turn off"
 msgstr ""
 
-#: homemesh/cli.py:172
+#: homemesh/cli.py:173
 msgid "Away from home: off. Turn on: homemesh away"
 msgstr ""
 
-#: homemesh/cli.py:191
+#: homemesh/cli.py:192
 #, python-brace-format
 msgid "  Code:  {code}"
 msgstr ""
 
-#: homemesh/cli.py:193
+#: homemesh/cli.py:194
 #, python-brace-format
 msgid "Check that {name} shows the same code."
 msgstr ""
 
-#: homemesh/cli.py:194
+#: homemesh/cli.py:195
 msgid ""
 "Paired computers have full access to each other's home folders: pair only "
 "your own."
 msgstr ""
 
-#: homemesh/cli.py:196
+#: homemesh/cli.py:197
 msgid "Does it match? [y/N] "
 msgstr ""
 
-#: homemesh/cli.py:199 homemesh/gui.py:621
+#: homemesh/cli.py:200 homemesh/gui.py:656
 #, python-brace-format
 msgid "Waiting for confirmation on {name}…"
 msgstr ""
 
-#: homemesh/cli.py:205
+#: homemesh/cli.py:206
 #, python-brace-format
 msgid "✓ Paired with {name}."
 msgstr ""
 
-#: homemesh/cli.py:215
+#: homemesh/cli.py:216
 #, python-brace-format
 msgid "Cannot listen on the network ({error})."
 msgstr ""
 
-#: homemesh/cli.py:231
+#: homemesh/cli.py:232
 msgid "Looking for computers with HomeMesh open…"
 msgstr ""
 
-#: homemesh/cli.py:237
+#: homemesh/cli.py:238
 msgid ""
 "None found. Open HomeMesh on the other computer (or run “homemesh pair --"
 "wait” there) and try again."
 msgstr ""
 
-#: homemesh/cli.py:241
+#: homemesh/cli.py:242
 msgid "  (sharing is off)"
 msgstr ""
 
-#: homemesh/cli.py:244
+#: homemesh/cli.py:245
 msgid "Computer number: "
 msgstr ""
 
-#: homemesh/cli.py:253
+#: homemesh/cli.py:254
 msgid "Sharing is off on this computer. First: homemesh enable"
 msgstr ""
 
-#: homemesh/cli.py:281
+#: homemesh/cli.py:282
 #, python-brace-format
 msgid ""
 "Waiting to be paired (port {port}). On the other computer, click “Connect” "
 "next to {name}. Ctrl+C stops."
 msgstr ""
 
-#: homemesh/cli.py:297
+#: homemesh/cli.py:298
 msgid "Catching up with the rest of the group…"
 msgstr ""
 
-#: homemesh/cli.py:307
+#: homemesh/cli.py:308
 #, python-brace-format
 msgid "No computer called “{name}”."
 msgstr ""
 
-#: homemesh/cli.py:311
+#: homemesh/cli.py:312
 #, python-brace-format
 msgid ""
 "Removed {name}. The other computers will learn about it the next time they "
 "sync."
 msgstr ""
 
-#: homemesh/cli.py:375
+#: homemesh/cli.py:376
 msgid "Remove this computer from the group and all HomeMesh settings? [y/N] "
 msgstr ""
 
-#: homemesh/cli.py:387
+#: homemesh/cli.py:388
 msgid "Done. To turn sharing off as well: homemesh disable"
 msgstr ""
 
-#: homemesh/cli.py:399
+#: homemesh/cli.py:394
+msgid ""
+"  ! Paired computers can run any program on this account, as you. Turn off: "
+"homemesh share terminal off"
+msgstr ""
+
+#: homemesh/cli.py:407
 #, python-brace-format
 msgid ""
 "Ended {n} running connections; other computers have to open the folder again."
 msgstr ""
 
-#: homemesh/cli.py:413
+#: homemesh/cli.py:423
+msgid "Say on or off: homemesh share terminal on|off"
+msgstr ""
+
+#: homemesh/cli.py:426
+msgid ""
+"The terminal goes with the whole home folder. First: homemesh share home"
+msgstr ""
+
+#: homemesh/cli.py:429
+msgid ""
+"Other computers learn of it when they next sync (homemesh sync does it now)."
+msgstr ""
+
+#: homemesh/cli.py:432
 msgid "Name a folder."
 msgstr ""
 
-#: homemesh/cli.py:419
+#: homemesh/cli.py:438
 #, python-brace-format
 msgid "No such folder: {path}"
 msgstr ""
 
-#: homemesh/cli.py:423
+#: homemesh/cli.py:442
 #, python-brace-format
 msgid "Sharing chosen folders needs: {packages}."
 msgstr ""
 
-#: homemesh/cli.py:426 homemesh/gui.py:552 homemesh/gui.py:1152
+#: homemesh/cli.py:445 homemesh/gui.py:586 homemesh/gui.py:1195
 msgid "Installed."
 msgstr ""
 
-#: homemesh/cli.py:442
+#: homemesh/cli.py:461
 msgid "At login: nothing"
 msgstr ""
 
-#: homemesh/cli.py:455
+#: homemesh/cli.py:474
 #, python-brace-format
 msgid ""
 "{app}: the home folders of your computers in your file manager. Without "
 "arguments it opens the window."
 msgstr ""
 
-#: homemesh/cli.py:458
+#: homemesh/cli.py:477
 msgid "COMMAND"
 msgstr ""
 
-#: homemesh/cli.py:459
+#: homemesh/cli.py:478
 msgid "the state of this computer and the group"
 msgstr ""
 
-#: homemesh/cli.py:460
+#: homemesh/cli.py:479
 msgid "turn sharing on (asks for the administrator password)"
 msgstr ""
 
-#: homemesh/cli.py:461
+#: homemesh/cli.py:480
 msgid "install missing packages without asking"
 msgstr ""
 
-#: homemesh/cli.py:463
+#: homemesh/cli.py:482
 msgid "turn sharing off"
 msgstr ""
 
-#: homemesh/cli.py:464
+#: homemesh/cli.py:483
 msgid "pair with another computer (with a code)"
 msgstr ""
 
-#: homemesh/cli.py:465
+#: homemesh/cli.py:484
 msgid "the other computer's name or address[:port]"
 msgstr ""
 
-#: homemesh/cli.py:466
+#: homemesh/cli.py:485
 msgid "wait for the other computer to start"
 msgstr ""
 
-#: homemesh/cli.py:468
+#: homemesh/cli.py:487
 msgid "remove a computer from the group"
 msgstr ""
 
-#: homemesh/cli.py:471
+#: homemesh/cli.py:490
 msgid "sync the group with the reachable computers"
 msgstr ""
 
-#: homemesh/cli.py:472
+#: homemesh/cli.py:491
 msgid ""
 "reach the computers away from home: sets up Tailscale (asks for the "
 "administrator password)"
 msgstr ""
 
-#: homemesh/cli.py:474
+#: homemesh/cli.py:493
 msgid "off: turns Tailscale off"
 msgstr ""
 
-#: homemesh/cli.py:476
+#: homemesh/cli.py:495
 msgid "rename this computer on the network"
 msgstr ""
 
-#: homemesh/cli.py:479
+#: homemesh/cli.py:498
 msgid "what other computers see: the whole home folder or chosen folders"
 msgstr ""
 
-#: homemesh/cli.py:482
-msgid "home: the whole home folder; add/remove: chosen folders"
+#: homemesh/cli.py:501
+msgid ""
+"home: the whole home folder; add/remove: chosen folders; terminal on/off: "
+"whether paired computers may run commands"
 msgstr ""
 
-#: homemesh/cli.py:484
+#: homemesh/cli.py:503
+msgid "a folder, or on/off after terminal"
+msgstr ""
+
+#: homemesh/cli.py:504
 msgid "read-only folder"
 msgstr ""
 
-#: homemesh/cli.py:486
+#: homemesh/cli.py:506
 msgid ""
 "syncing the group, connecting computers and marking the ones that are off, "
 "from login on"
 msgstr ""
 
-#: homemesh/cli.py:490
+#: homemesh/cli.py:510
 msgid "leave the group and remove HomeMesh's settings"
 msgstr ""
 
-#: homemesh/gui.py:207 homemesh/gui.py:258 homemesh/gui.py:358
-#: homemesh/gui.py:500 homemesh/gui.py:594 homemesh/gui.py:619
+#: homemesh/gui.py:111
+msgid "Paired computers can run commands here"
+msgstr ""
+
+#: homemesh/gui.py:112
+msgid ""
+"They can open a terminal and run any program on this account, as you. If you "
+"do not want that, turn it off: they keep access to the files."
+msgstr ""
+
+#: homemesh/gui.py:228 homemesh/gui.py:279 homemesh/gui.py:379
+#: homemesh/gui.py:530 homemesh/gui.py:629 homemesh/gui.py:654
 msgid "Cancel"
 msgstr ""
 
-#: homemesh/gui.py:239 homemesh/gui.py:241 homemesh/gui.py:340
-#: homemesh/gui.py:342 homemesh/gui.py:413 homemesh/gui.py:426
-#: homemesh/gui.py:458 homemesh/gui.py:639 homemesh/gui.py:651
+#: homemesh/gui.py:260 homemesh/gui.py:262 homemesh/gui.py:361
+#: homemesh/gui.py:363 homemesh/gui.py:434 homemesh/gui.py:447
+#: homemesh/gui.py:479 homemesh/gui.py:674 homemesh/gui.py:686
 msgid "Close"
 msgstr ""
 
-#: homemesh/gui.py:242 homemesh/gui.py:496 homemesh/gui.py:1001
-#: homemesh/gui.py:1036
+#: homemesh/gui.py:263 homemesh/gui.py:526 homemesh/gui.py:1044
+#: homemesh/gui.py:1079
 msgid "Install missing packages"
 msgstr ""
 
-#: homemesh/gui.py:248
+#: homemesh/gui.py:269
 msgid "Computer name"
 msgstr ""
 
-#: homemesh/gui.py:254
+#: homemesh/gui.py:275
 msgid "Computer name on the network"
 msgstr ""
 
-#: homemesh/gui.py:255
+#: homemesh/gui.py:276
 msgid ""
 "Other computers will see it under this name. Lowercase letters, digits and "
 "hyphens, for example “annas-laptop”."
 msgstr ""
 
-#: homemesh/gui.py:259
+#: homemesh/gui.py:280
 msgid "Change"
 msgstr ""
 
-#: homemesh/gui.py:266
+#: homemesh/gui.py:287
 msgid "Only lowercase letters, digits and hyphens."
 msgstr ""
 
-#: homemesh/gui.py:281 homemesh/gui.py:800
+#: homemesh/gui.py:302 homemesh/gui.py:841
 msgid "Away from home"
 msgstr ""
 
-#: homemesh/gui.py:289
+#: homemesh/gui.py:310
 msgid ""
 "Away from home, files travel over your home's internet uplink, so large "
 "files are slower than on the local network."
 msgstr ""
 
-#: homemesh/gui.py:293 homemesh/gui.py:302
+#: homemesh/gui.py:314 homemesh/gui.py:323
 msgid "Access from away"
 msgstr ""
 
-#: homemesh/gui.py:294
+#: homemesh/gui.py:315
 #, python-brace-format
 msgid ""
 "This computer is reachable through {vpn}. Paired computers that also have a "
 "VPN open it from away, with the same bookmarks as at home."
 msgstr ""
 
-#: homemesh/gui.py:297
+#: homemesh/gui.py:318
 msgid ""
 "Your other computers need the VPN too. While they are at home, they exchange "
 "their VPN addresses by themselves."
 msgstr ""
 
-#: homemesh/gui.py:303
+#: homemesh/gui.py:324
 msgid ""
 "At home computers talk over the local network. Away from home they need a "
 "VPN to reach each other over the internet."
 msgstr ""
 
-#: homemesh/gui.py:305
+#: homemesh/gui.py:326
 msgid ""
 "HomeMesh can set up Tailscale for you: it installs it, turns it on and opens "
 "the login page in your browser. Tailscale is free for personal use."
 msgstr ""
 
-#: homemesh/gui.py:308
+#: homemesh/gui.py:329
 msgid ""
 "Do the same on each of your computers and log in with the same account. "
 "While they are at home, they exchange their VPN addresses by themselves."
 msgstr ""
 
-#: homemesh/gui.py:311
+#: homemesh/gui.py:332
 msgid ""
 "Already using NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? HomeMesh "
 "finds them by itself; there is nothing to set up."
 msgstr ""
 
-#: homemesh/gui.py:320
+#: homemesh/gui.py:341
 msgid "Open the page again"
 msgstr ""
 
-#: homemesh/gui.py:343
+#: homemesh/gui.py:364
 msgid "Set up Tailscale"
 msgstr ""
 
-#: homemesh/gui.py:372
+#: homemesh/gui.py:393
 msgid "Installing and starting Tailscale…"
 msgstr ""
 
-#: homemesh/gui.py:373
+#: homemesh/gui.py:394
 msgid ""
 "If a window asks for the administrator password, enter it. Downloading "
 "Tailscale can take a minute."
 msgstr ""
 
-#: homemesh/gui.py:381
+#: homemesh/gui.py:402
 msgid "Approve this computer"
 msgstr ""
 
-#: homemesh/gui.py:382
+#: homemesh/gui.py:403
 msgid ""
 "Your Tailscale network wants new computers approved. The admin page has "
 "opened in your browser."
 msgstr ""
 
-#: homemesh/gui.py:385
+#: homemesh/gui.py:406
 msgid "Log in to Tailscale in your browser"
 msgstr ""
 
-#: homemesh/gui.py:386
+#: homemesh/gui.py:407
 msgid ""
 "The login page has opened in your browser. Use the same account on all your "
 "computers. This window carries on by itself once you have logged in."
 msgstr ""
 
-#: homemesh/gui.py:408
+#: homemesh/gui.py:429
 msgid "Tailscale is on"
 msgstr ""
 
-#: homemesh/gui.py:409
+#: homemesh/gui.py:430
 #, python-brace-format
 msgid "This computer is reachable through {vpn}."
 msgstr ""
 
-#: homemesh/gui.py:416
+#: homemesh/gui.py:437
 msgid "Tailscale is not set up"
 msgstr ""
 
-#: homemesh/gui.py:427
+#: homemesh/gui.py:448
 msgid "Try again"
 msgstr ""
 
-#: homemesh/gui.py:434
+#: homemesh/gui.py:455
 msgid "Local network"
 msgstr ""
 
-#: homemesh/gui.py:437 homemesh/gui.py:1042
+#: homemesh/gui.py:458 homemesh/gui.py:1085
 msgid "The local network keeps breaking"
 msgstr ""
 
-#: homemesh/gui.py:438
+#: homemesh/gui.py:459
 #, python-brace-format
 msgid ""
 "In the last three days it broke {n} times between this computer and {names}: "
@@ -701,7 +737,7 @@ msgid ""
 "the local network."
 msgstr ""
 
-#: homemesh/gui.py:445
+#: homemesh/gui.py:466
 #, python-brace-format
 msgid ""
 "The Wi-Fi of this computer changed access points {n} times in an hour. It is "
@@ -709,566 +745,600 @@ msgid ""
 "router."
 msgstr ""
 
-#: homemesh/gui.py:448
+#: homemesh/gui.py:469
 msgid "What usually helps"
 msgstr ""
 
-#: homemesh/gui.py:449
+#: homemesh/gui.py:470
 msgid ""
 "Update the software (firmware) of the router and of the mesh nodes, then "
 "restart them."
 msgstr ""
 
-#: homemesh/gui.py:450
+#: homemesh/gui.py:471
 msgid ""
 "If the bands of the router (2.4 and 5 GHz) share one name, give each its own "
 "and use one of them on the computers. They then stop jumping between the "
 "bands and still move between mesh nodes."
 msgstr ""
 
-#: homemesh/gui.py:453
+#: homemesh/gui.py:474
 msgid "Connect a computer that stays in one place with a cable."
 msgstr ""
 
-#: homemesh/gui.py:455
+#: homemesh/gui.py:476
 msgid "More…"
 msgstr ""
 
 #. Translators: a page in your language if there is one, such as local-network.pl.md
-#: homemesh/gui.py:457
+#: homemesh/gui.py:478
 msgid "https://github.com/MikolajQ/homemesh/blob/main/docs/local-network.md"
 msgstr ""
 
-#: homemesh/gui.py:465
+#: homemesh/gui.py:486
 msgid "What to share"
 msgstr ""
 
-#: homemesh/gui.py:471 homemesh/share.py:162
+#: homemesh/gui.py:492
 msgid "The whole home folder"
 msgstr ""
 
-#: homemesh/gui.py:472
+#: homemesh/gui.py:493
 msgid "Only chosen folders"
 msgstr ""
 
-#: homemesh/gui.py:476
+#: homemesh/gui.py:497
 msgid ""
 "Paired computers get the same access as you: they see and change everything, "
 "settings and keys included."
 msgstr ""
 
-#: homemesh/gui.py:478
+#: homemesh/gui.py:499
 msgid ""
 "Paired computers see only these folders. The rest of your home folder, your "
 "settings and your keys are invisible to them."
 msgstr ""
 
-#: homemesh/gui.py:480
+#: homemesh/gui.py:501
 #, python-brace-format
 msgid "Needs: {packages}."
 msgstr ""
 
-#: homemesh/gui.py:486
-msgid "No folder chosen yet."
+#: homemesh/gui.py:503
+msgid "Also running commands (terminal)"
 msgstr ""
 
-#: homemesh/gui.py:488
-msgid "Add folder…"
-msgstr ""
-
-#: homemesh/gui.py:491
-msgid "What paired computers see"
-msgstr ""
-
-#: homemesh/gui.py:501
-msgid "Save"
+#: homemesh/gui.py:506
+msgid ""
+"Files only. Whoever can change every file could still slip a command into a "
+"startup script; to keep the others out of the rest, share chosen folders."
 msgstr ""
 
 #: homemesh/gui.py:515
+msgid "No folder chosen yet."
+msgstr ""
+
+#: homemesh/gui.py:517
+msgid "Add folder…"
+msgstr ""
+
+#: homemesh/gui.py:520
+msgid "What paired computers see"
+msgstr ""
+
+#: homemesh/gui.py:531
+msgid "Save"
+msgstr ""
+
+#: homemesh/gui.py:546
 msgid "Read-only"
 msgstr ""
 
-#: homemesh/gui.py:518
+#: homemesh/gui.py:549
 msgid "Remove from the list"
 msgstr ""
 
-#: homemesh/gui.py:533
+#: homemesh/gui.py:567
 msgid "Choose a folder to share"
 msgstr ""
 
-#: homemesh/gui.py:563
+#: homemesh/gui.py:598
 #, python-brace-format
 msgid "Pairing with {name}"
 msgstr ""
 
-#: homemesh/gui.py:564
+#: homemesh/gui.py:599
 #, python-brace-format
 msgid "{name} wants to pair"
 msgstr ""
 
-#: homemesh/gui.py:576
+#: homemesh/gui.py:611
 #, python-brace-format
 msgid "Connecting to {name}…"
 msgstr ""
 
-#: homemesh/gui.py:583
+#: homemesh/gui.py:618
 msgid ""
 "Paired computers have full access to each other's home folders. Pair only "
 "your own computers."
 msgstr ""
 
-#: homemesh/gui.py:606
+#: homemesh/gui.py:641
 #, python-brace-format
 msgid ""
 "Check that {name} shows the same code. If it does, click “Matches” on both "
 "computers."
 msgstr ""
 
-#: homemesh/gui.py:611
+#: homemesh/gui.py:646
 msgid "Does not match"
 msgstr ""
 
-#: homemesh/gui.py:612
+#: homemesh/gui.py:647
 msgid "Matches"
 msgstr ""
 
-#: homemesh/gui.py:625
+#: homemesh/gui.py:660
 #, python-brace-format
 msgid "{name} says the code matches."
 msgstr ""
 
-#: homemesh/gui.py:632
+#: homemesh/gui.py:667
 #, python-brace-format
 msgid "Paired with {name}"
 msgstr ""
 
-#: homemesh/gui.py:633
+#: homemesh/gui.py:668
 #, python-brace-format
 msgid ""
 "The home folder of {name} is now in your file manager's sidebar. The other "
 "computers in the group will learn about it by themselves."
 msgstr ""
 
-#: homemesh/gui.py:640 homemesh/gui.py:695
+#: homemesh/gui.py:675 homemesh/gui.py:730
 msgid "Open"
 msgstr ""
 
-#: homemesh/gui.py:647
+#: homemesh/gui.py:682
 msgid "Not paired"
 msgstr ""
 
-#: homemesh/gui.py:698
+#: homemesh/gui.py:732
+msgid "Terminal"
+msgstr ""
+
+#: homemesh/gui.py:733
+#, python-brace-format
+msgid "A command line on {name}"
+msgstr ""
+
+#: homemesh/gui.py:737
 msgid "More"
 msgstr ""
 
-#: homemesh/gui.py:701
+#: homemesh/gui.py:740
 msgid "Connect at login"
 msgstr ""
 
-#: homemesh/gui.py:703
+#: homemesh/gui.py:742
 msgid "Remove from the group…"
 msgstr ""
 
-#: homemesh/gui.py:717
+#: homemesh/gui.py:756
 msgid "checking…"
 msgstr ""
 
-#: homemesh/gui.py:721
+#: homemesh/gui.py:760
 msgid "reachable on the local network"
 msgstr ""
 
-#: homemesh/gui.py:723
+#: homemesh/gui.py:762
 msgid "reachable through VPN"
 msgstr ""
 
-#: homemesh/gui.py:733
+#: homemesh/gui.py:772
 msgid "ready to pair"
 msgstr ""
 
-#: homemesh/gui.py:733
+#: homemesh/gui.py:772
 msgid "sharing is off"
 msgstr ""
 
-#: homemesh/gui.py:738
+#: homemesh/gui.py:777
 msgid "Connect"
 msgstr ""
 
-#: homemesh/gui.py:767
+#: homemesh/gui.py:806
 msgid "Sync the group now"
 msgstr ""
 
-#: homemesh/gui.py:768
+#: homemesh/gui.py:807
 msgid "About"
 msgstr ""
 
-#: homemesh/gui.py:770
+#: homemesh/gui.py:809
 msgid "Menu"
 msgstr ""
 
-#: homemesh/gui.py:777 homemesh/gui.py:1433
+#: homemesh/gui.py:816 homemesh/gui.py:1501
 msgid "Sharing"
 msgstr ""
 
-#: homemesh/gui.py:791
+#: homemesh/gui.py:830
 msgid "What other computers see"
 msgstr ""
 
-#: homemesh/gui.py:796
+#: homemesh/gui.py:834 homemesh/gui.py:1182 homemesh/gui.py:1228
+msgid "Turn off"
+msgstr ""
+
+#: homemesh/gui.py:836
 msgid "Change…"
 msgstr ""
 
-#: homemesh/gui.py:807
+#: homemesh/gui.py:848
 msgid "How does it work?"
 msgstr ""
 
-#: homemesh/gui.py:813
+#: homemesh/gui.py:854
 msgid "At login"
 msgstr ""
 
-#: homemesh/gui.py:814
+#: homemesh/gui.py:855
 msgid ""
 "Sync the group, connect the computers marked “Connect at login” and keep the "
 "ones that are off marked “(off)” in the file manager. Sharing works without "
 "this too."
 msgstr ""
 
-#: homemesh/gui.py:827
+#: homemesh/gui.py:868
 msgid "None yet. Pair with a computer from the list below."
 msgstr ""
 
-#: homemesh/gui.py:832
+#: homemesh/gui.py:873
 msgid "Looking for computers with HomeMesh open on this network…"
 msgstr ""
 
-#: homemesh/gui.py:839
+#: homemesh/gui.py:880
 msgid "This computer"
 msgstr ""
 
-#: homemesh/gui.py:840
+#: homemesh/gui.py:881
 msgid "Paired computers"
 msgstr ""
 
-#: homemesh/gui.py:841
+#: homemesh/gui.py:882
 msgid "Nearby"
 msgstr ""
 
-#: homemesh/gui.py:876
+#: homemesh/gui.py:917
 #, python-brace-format
 msgid "Cannot accept pairing requests: {error}"
 msgstr ""
 
-#: homemesh/gui.py:880
+#: homemesh/gui.py:921
 #, python-brace-format
 msgid "Cannot look for computers on the network: {error}"
 msgstr ""
 
-#: homemesh/gui.py:951
+#: homemesh/gui.py:992
 msgid "Sharing is off. Other computers have no access here."
 msgstr ""
 
-#: homemesh/gui.py:953
+#: homemesh/gui.py:994
 msgid "Sharing is on, but the SSH server is not running."
 msgstr ""
 
-#: homemesh/gui.py:955
+#: homemesh/gui.py:996
 #, python-brace-format
 msgid "Sharing is on. Other computers see it as {name}.local."
 msgstr ""
 
-#: homemesh/gui.py:960
+#: homemesh/gui.py:1003
 msgid "Turning Tailscale off…"
 msgstr ""
 
-#: homemesh/gui.py:962
+#: homemesh/gui.py:1005
 #, python-brace-format
 msgid ""
 "Reachable through {vpn}. Paired computers that also have a VPN can open this "
 "computer from away too."
 msgstr ""
 
-#: homemesh/gui.py:965
+#: homemesh/gui.py:1008
 msgid ""
 "Only on the local network. HomeMesh can set up Tailscale, so that your "
 "computers reach each other from anywhere."
 msgstr ""
 
-#: homemesh/gui.py:969
+#: homemesh/gui.py:1012
 #, python-brace-format
 msgid "Turn {vpn} off where you set it up."
 msgstr ""
 
-#: homemesh/gui.py:991
+#: homemesh/gui.py:1034
 msgid "Installing packages…"
 msgstr ""
 
-#: homemesh/gui.py:992
+#: homemesh/gui.py:1035
 msgid ""
 "If a window asks for the administrator password, enter it. Installing can "
 "take a minute."
 msgstr ""
 
-#: homemesh/gui.py:995
+#: homemesh/gui.py:1038
 msgid "One moment…"
 msgstr ""
 
-#: homemesh/gui.py:996
+#: homemesh/gui.py:1039
 msgid ""
 "Changing settings. If a window asks for the administrator password, enter it."
 msgstr ""
 
-#: homemesh/gui.py:998
+#: homemesh/gui.py:1041
 msgid "Some needed packages are missing"
 msgstr ""
 
-#: homemesh/gui.py:999
+#: homemesh/gui.py:1042
 #, python-brace-format
 msgid ""
 "Missing: {packages}. HomeMesh can install them and turn sharing on. You will "
 "be asked for the administrator password."
 msgstr ""
 
-#: homemesh/gui.py:1003
+#: homemesh/gui.py:1046
 msgid "Step 1 of 3: turn sharing on"
 msgstr ""
 
-#: homemesh/gui.py:1004
+#: homemesh/gui.py:1047
 msgid ""
 "This lets your other computers open this computer's home folder. You will be "
 "asked for the administrator password."
 msgstr ""
 
-#: homemesh/gui.py:1005
+#: homemesh/gui.py:1048
 msgid "Turn on"
 msgstr ""
 
-#: homemesh/gui.py:1007
+#: homemesh/gui.py:1050
 msgid "The SSH server is not running"
 msgstr ""
 
-#: homemesh/gui.py:1008 homemesh/gui.py:1013
+#: homemesh/gui.py:1051 homemesh/gui.py:1056
 msgid "Fix"
 msgstr ""
 
-#: homemesh/gui.py:1008
+#: homemesh/gui.py:1051
 msgid "Without it, other computers cannot open this computer."
 msgstr ""
 
-#: homemesh/gui.py:1010
+#: homemesh/gui.py:1053
 msgid "Other computers cannot find this one by name"
 msgstr ""
 
-#: homemesh/gui.py:1012
+#: homemesh/gui.py:1055
 #, python-brace-format
 msgid "mDNS, which answers to {name}.local, is missing or turned off."
 msgstr ""
 
-#: homemesh/gui.py:1015
+#: homemesh/gui.py:1058
 #, python-brace-format
 msgid "Two computers are called “{name}”"
 msgstr ""
 
-#: homemesh/gui.py:1016
+#: homemesh/gui.py:1059
 msgid ""
 "Computers on a network need different names. Give this one another name."
 msgstr ""
 
-#: homemesh/gui.py:1017
+#: homemesh/gui.py:1060
 msgid "Rename"
 msgstr ""
 
-#: homemesh/gui.py:1019
+#: homemesh/gui.py:1062
 msgid "Step 3 of 3: pair the computers"
 msgstr ""
 
-#: homemesh/gui.py:1020
+#: homemesh/gui.py:1063
 msgid ""
 "Click “Connect” next to a computer below and compare the codes on both "
 "screens."
 msgstr ""
 
-#: homemesh/gui.py:1022
+#: homemesh/gui.py:1065
 msgid "Step 2 of 3: enable sharing on the other computer"
 msgstr ""
 
-#: homemesh/gui.py:1023
+#: homemesh/gui.py:1066
 #, python-brace-format
 msgid "On {name}, click “Turn on” in HomeMesh."
 msgstr ""
 
-#: homemesh/gui.py:1025
+#: homemesh/gui.py:1068
 msgid "Step 2 of 3: open HomeMesh on the other computer"
 msgstr ""
 
-#: homemesh/gui.py:1026
+#: homemesh/gui.py:1069
 msgid ""
 "Install and start HomeMesh on another computer on the same network. It will "
 "appear below, under “Nearby”."
 msgstr ""
 
-#: homemesh/gui.py:1029
+#: homemesh/gui.py:1072
 msgid "Log out and back in"
 msgstr ""
 
-#: homemesh/gui.py:1030
+#: homemesh/gui.py:1073
 msgid "After that, your file manager can open the paired computers."
 msgstr ""
 
-#: homemesh/gui.py:1032
+#: homemesh/gui.py:1075
 msgid "Your file manager cannot open the paired computers"
 msgstr ""
 
-#: homemesh/gui.py:1034
+#: homemesh/gui.py:1077
 #, python-brace-format
 msgid ""
 "Missing: {packages}. HomeMesh can install it. You will be asked for the "
 "administrator password."
 msgstr ""
 
-#: homemesh/gui.py:1038
+#: homemesh/gui.py:1081
 msgid "Another computer is nearby"
 msgstr ""
 
-#: homemesh/gui.py:1039
+#: homemesh/gui.py:1082
 #, python-brace-format
 msgid "Click “Connect” to add {name} to the group."
 msgstr ""
 
-#: homemesh/gui.py:1043
+#: homemesh/gui.py:1086
 #, python-brace-format
 msgid "So connections to {names} go through {vpn} first, which survives it."
 msgstr ""
 
-#: homemesh/gui.py:1045
+#: homemesh/gui.py:1088
 msgid "What helps…"
 msgstr ""
 
-#: homemesh/gui.py:1047
+#: homemesh/gui.py:1090
 msgid "All set"
 msgstr ""
 
-#: homemesh/gui.py:1048
+#: homemesh/gui.py:1091
 msgid ""
 "Paired computers are in your file manager's sidebar. A new computer only "
 "needs pairing with one of them: the others learn about it by themselves."
 msgstr ""
 
-#: homemesh/gui.py:1050
+#: homemesh/gui.py:1093
 msgid "Computers that are off are marked “(off)” there."
 msgstr ""
 
-#: homemesh/gui.py:1109
+#: homemesh/gui.py:1152
 msgid "Already syncing…"
 msgstr ""
 
-#: homemesh/gui.py:1109
+#: homemesh/gui.py:1152
 msgid "No paired computers."
 msgstr ""
 
-#: homemesh/gui.py:1123
+#: homemesh/gui.py:1166
 #, python-brace-format
 msgid "Synced with {n} of {total} computers."
 msgstr ""
 
-#: homemesh/gui.py:1136
+#: homemesh/gui.py:1179
 msgid "Turn sharing off?"
 msgstr ""
 
-#: homemesh/gui.py:1137
+#: homemesh/gui.py:1180
 msgid ""
 "Paired computers lose access to this computer. The group stays: turn sharing "
 "back on and everything works as before."
 msgstr ""
 
-#: homemesh/gui.py:1139 homemesh/gui.py:1185
-msgid "Turn off"
-msgstr ""
-
-#: homemesh/gui.py:1144 homemesh/gui.py:1147
+#: homemesh/gui.py:1187 homemesh/gui.py:1190
 msgid "Sharing is on."
 msgstr ""
 
-#: homemesh/gui.py:1182
+#: homemesh/gui.py:1225
 msgid "Turn access from away off?"
 msgstr ""
 
-#: homemesh/gui.py:1183
+#: homemesh/gui.py:1226
 msgid ""
 "HomeMesh turns Tailscale off on this computer, so paired computers reach it "
 "only on the local network. Turn it back on here at any time, without logging "
 "in again."
 msgstr ""
 
-#: homemesh/gui.py:1202
+#: homemesh/gui.py:1245
 msgid "Access from away is off."
 msgstr ""
 
-#: homemesh/gui.py:1216
+#: homemesh/gui.py:1260
 msgid "Saved. Other computers have to open this computer again."
 msgstr ""
 
-#: homemesh/gui.py:1218
+#: homemesh/gui.py:1262
 msgid "Saved."
 msgstr ""
 
-#: homemesh/gui.py:1240 homemesh/tailscale.py:120 homemesh/tailscale.py:179
+#: homemesh/gui.py:1289 homemesh/tailscale.py:120 homemesh/tailscale.py:179
 msgid "Not everything worked"
 msgstr ""
 
-#: homemesh/gui.py:1243
+#: homemesh/gui.py:1292
 msgid "That did not work."
 msgstr ""
 
-#: homemesh/gui.py:1258
+#: homemesh/gui.py:1307
 msgid "Already pairing with another computer."
 msgstr ""
 
-#: homemesh/gui.py:1310
-#, python-brace-format
-msgid "Opening {name}…"
+#: homemesh/gui.py:1360
+msgid ""
+"No terminal program found. Install one, for example Konsole or GNOME Console."
 msgstr ""
 
-#: homemesh/gui.py:1324
+#: homemesh/gui.py:1368
 #, python-brace-format
-msgid "Could not open {name}: {error}"
+msgid "Could not open a terminal: {error}"
 msgstr ""
 
 #: homemesh/gui.py:1370
 #, python-brace-format
-msgid "No file manager could open {uri}."
+msgid "Opening a terminal on {name}…"
 msgstr ""
 
 #: homemesh/gui.py:1377
 #, python-brace-format
-msgid "{name} will be connected at login."
-msgstr ""
-
-#: homemesh/gui.py:1378
-#, python-brace-format
-msgid "{name} will not be connected at login."
+msgid "Opening {name}…"
 msgstr ""
 
 #: homemesh/gui.py:1391
 #, python-brace-format
+msgid "Could not open {name}: {error}"
+msgstr ""
+
+#: homemesh/gui.py:1437
+#, python-brace-format
+msgid "No file manager could open {uri}."
+msgstr ""
+
+#: homemesh/gui.py:1444
+#, python-brace-format
+msgid "{name} will be connected at login."
+msgstr ""
+
+#: homemesh/gui.py:1445
+#, python-brace-format
+msgid "{name} will not be connected at login."
+msgstr ""
+
+#: homemesh/gui.py:1458
+#, python-brace-format
 msgid "Removed {name} from the group."
 msgstr ""
 
-#: homemesh/gui.py:1393
+#: homemesh/gui.py:1460
 #, python-brace-format
 msgid "Remove {name} from the group?"
 msgstr ""
 
-#: homemesh/gui.py:1394
+#: homemesh/gui.py:1461
 #, python-brace-format
 msgid ""
 "{name} loses access to this computer, and the other computers in the group "
 "learn about it the next time they sync."
 msgstr ""
 
-#: homemesh/gui.py:1396
+#: homemesh/gui.py:1463
 msgid "Remove"
 msgstr ""
 
-#: homemesh/gui.py:1522
+#: homemesh/gui.py:1590
 msgid "The home folders of your computers in your file manager."
 msgstr ""
 
@@ -1348,23 +1418,37 @@ msgid ""
 "it. Stopped."
 msgstr ""
 
-#: homemesh/share.py:151
+#: homemesh/share.py:165
 msgid "HomeMesh: the bubblewrap package is missing, so nothing is shared.\n"
 msgstr ""
 
-#: homemesh/share.py:156
+#: homemesh/share.py:171
+msgid ""
+"HomeMesh: this computer shares files only; the terminal is off in its "
+"HomeMesh settings.\n"
+msgstr ""
+
+#: homemesh/share.py:174
 msgid "HomeMesh: this computer shares only chosen folders, over SFTP.\n"
 msgstr ""
 
-#: homemesh/share.py:164
+#: homemesh/share.py:181
+msgid "The whole home folder, and running commands (terminal)"
+msgstr ""
+
+#: homemesh/share.py:182
+msgid "The whole home folder, files only (no terminal)"
+msgstr ""
+
+#: homemesh/share.py:184
 msgid "Nothing (no folder chosen)"
 msgstr ""
 
-#: homemesh/share.py:168
+#: homemesh/share.py:188
 msgid "read-only"
 msgstr ""
 
-#: homemesh/share.py:168
+#: homemesh/share.py:188
 msgid "read-write"
 msgstr ""
 
@@ -1398,4 +1482,8 @@ msgstr ""
 
 #: homemesh/tailscale.py:182
 msgid "Tailscale did not turn off."
+msgstr ""
+
+#: homemesh/terminal.py:121
+msgid "Press Enter to close this window."
 msgstr ""

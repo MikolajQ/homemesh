@@ -18,7 +18,7 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from . import (APP_ID, APP_NAME, __version__, breaks, paths, proto, render, share, state, sync,  # noqa: E402
+from . import (APP_ID, APP_NAME, __version__, breaks, paths, proto, render, share, state, sync, terminal,  # noqa: E402
                system, tailscale, vpn, watch)
 from .discovery import Discovery  # noqa: E402
 from .i18n import _  # noqa: E402
@@ -47,6 +47,9 @@ list.boxed > row:not(:last-child) { border-bottom: 1px solid alpha(currentColor,
          padding: 8px 18px; margin: 18px; }
 .placeholder { padding: 18px; }
 .monospace { font-family: monospace; }
+.danger { border-radius: 12px; padding: 10px 12px; background-color: alpha(@error_color, 0.16);
+          border: 1px solid alpha(@error_color, 0.6); }
+.danger-title { font-weight: bold; color: @error_color; }
 """
 
 
@@ -90,6 +93,24 @@ def button(text, callback, *classes):
     for css in classes:
         widget.add_css_class(css)
     return widget
+
+
+def danger(title, text, *buttons):
+    """A warning that has to stand out: red frame, red title."""
+    icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+    icon.add_css_class("danger-title")
+    icon.set_valign(Gtk.Align.START)
+    texts = vbox(2, label(title, "danger-title", wrap=True), label(text, "small", wrap=True))
+    texts.set_hexpand(True)
+    box = hbox(10, icon, texts, *buttons)
+    box.add_css_class("danger")
+    return box
+
+
+def commands_warning(*buttons):
+    return danger(_("Paired computers can run commands here"),
+                  _("They can open a terminal and run any program on this account, as you. "
+                    "If you do not want that, turn it off: they keep access to the files."), *buttons)
 
 
 def clear(listbox):
@@ -479,6 +500,14 @@ class ShareDialog(Dialog):
                               "folder, your settings and your keys are invisible to them.")
                             + ("" if available else "\n" + _("Needs: {packages}.").format(
                                 packages=system.thing_names(self.missing))), "dim", "small", wrap=True)
+        self.shell = Gtk.CheckButton(label=_("Also running commands (terminal)"),
+                                     active=current.get("shell", True))
+        self.shell_on = commands_warning()
+        self.shell_off = label(_("Files only. Whoever can change every file could still slip a command into "
+                                 "a startup script; to keep the others out of the rest, share chosen folders."),
+                               "dim", "small", wrap=True)
+        for widget in (self.shell, self.shell_on, self.shell_off):
+            widget.set_margin_start(28)
         for note in (home_note, chosen_note):
             note.set_margin_start(28)
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
@@ -489,7 +518,8 @@ class ShareDialog(Dialog):
         self.pick.set_halign(Gtk.Align.START)
         self.pick.set_margin_start(28)
         self.content(label(_("What paired computers see"), "big"),
-                     self.home, home_note, self.chosen, chosen_note)
+                     self.home, home_note, self.shell, self.shell_on, self.shell_off,
+                     self.chosen, chosen_note)
         if available:
             self.content(self.list, self.pick)
         else:
@@ -502,6 +532,7 @@ class ShareDialog(Dialog):
         # Not the other one: of the pair, GTK reports the one switched off first,
         # while the one switched on still reads as off.
         self.chosen.connect("toggled", lambda *_a: self._update())
+        self.shell.connect("toggled", lambda *_a: self._update())
         self._rebuild()
 
     def _rebuild(self):
@@ -525,6 +556,9 @@ class ShareDialog(Dialog):
 
     def _update(self):
         chosen = self.chosen.get_active()
+        self.shell.set_sensitive(not chosen)
+        self.shell_on.set_visible(not chosen and self.shell.get_active())
+        self.shell_off.set_visible(not chosen and not self.shell.get_active())
         self.list.set_sensitive(chosen)
         self.pick.set_sensitive(chosen)
         self.save.set_sensitive(not chosen or bool(self.folders))
@@ -553,7 +587,8 @@ class ShareDialog(Dialog):
 
     def _save(self):
         self.close()
-        self.callback({"mode": "folders" if self.chosen.get_active() else "home", "folders": self.folders})
+        self.callback({"mode": "folders" if self.chosen.get_active() else "home", "folders": self.folders,
+                       "shell": self.shell.get_active()})
 
 
 class PairDialog(Dialog):
@@ -693,6 +728,10 @@ class PeerRow(Gtk.ListBoxRow):
         texts = vbox(2, self.title, self.subtitle)
         texts.set_hexpand(True)
         open_button = button(_("Open"), lambda: window.open_peer(pid))
+        # Only where the other computer allows it; its card says so.
+        shell_button = button(_("Terminal"), lambda: window.open_terminal(pid))
+        shell_button.set_tooltip_text(_("A command line on {name}").format(name=peer["name"]))
+        shell_button.set_visible(peer.get("shell") is True)
 
         menu = Gtk.MenuButton(icon_name="view-more-symbolic", valign=Gtk.Align.CENTER,
                               tooltip_text=_("More"))
@@ -705,7 +744,7 @@ class PeerRow(Gtk.ListBoxRow):
         remove.connect("clicked", lambda *_a: (popover.popdown(), window.ask_remove(pid)))
         popover.set_child(vbox(4, automount, remove, margin=6))
         menu.set_popover(popover)
-        self.set_child(hbox(12, self.dot, texts, open_button, menu))
+        self.set_child(hbox(12, self.dot, texts, shell_button, open_button, menu))
         self.set_online("checking")
 
     def set_online(self, how):
@@ -792,8 +831,10 @@ class MainWindow(Gtk.ApplicationWindow):
         share_texts.set_hexpand(True)
         folder_icon = Gtk.Image.new_from_icon_name("folder-remote-symbolic")
         folder_icon.set_pixel_size(24)
+        self.shell_warning = commands_warning(button(_("Turn off"), self.commands_off))
         row = Gtk.ListBoxRow(activatable=False)
-        row.set_child(hbox(12, folder_icon, share_texts, button(_("Change…"), self.ask_share)))
+        row.set_child(vbox(10, hbox(12, folder_icon, share_texts, button(_("Change…"), self.ask_share)),
+                           self.shell_warning))
         this_list.append(row)
 
         self.away_text = label("", "dim", "small", wrap=True)
@@ -954,7 +995,9 @@ class MainWindow(Gtk.ApplicationWindow):
         else:
             text = _("Sharing is on. Other computers see it as {name}.local.").format(name=name)
         self.this_text.set_text(text)
-        self.share_text.set_text(share.summary(share.current(self.st)))
+        shared = share.current(self.st)
+        self.share_text.set_text(share.summary(shared))
+        self.shell_warning.set_visible(share.allows_commands(shared))
         tunnels = self.tunnels
         if self.away_busy:
             self.away_text.set_text(_("Turning Tailscale off…"))
@@ -1208,6 +1251,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def save_share(self, new):
         with state.transaction() as st:
+            commands = share.allows_commands(share.current(st))
             st["share"] = new
             render.apply(st)
         self.refresh_state()
@@ -1216,6 +1260,11 @@ class MainWindow(Gtk.ApplicationWindow):
             self.toast(_("Saved. Other computers have to open this computer again."))
         else:
             self.toast(_("Saved."))
+        if share.allows_commands(share.current(self.st)) != commands:
+            self.sync_now(quiet=True)  # the others show or hide their Terminal button
+
+    def commands_off(self):
+        self.save_share(dict(share.current(self.st), shell=False))
 
     def run_helper(self, args, done_text, then=None):
         if self.helper_busy:
@@ -1301,6 +1350,24 @@ class MainWindow(Gtk.ApplicationWindow):
             idle(self.refresh_state)
             idle(self.check_online)
             idle(lambda: watch.start(self.st))
+
+    def open_terminal(self, pid):
+        peer = self.st["peers"].get(pid)
+        if not peer:
+            return
+        command = terminal.command_line(render.aliases(self.st)[pid])
+        if command is None:
+            self.toast(_("No terminal program found. Install one, for example Konsole or GNOME Console."))
+            return
+        # Through GIO, so the window gets the startup notification and comes to the front.
+        line = " ".join(GLib.shell_quote(word) for word in command).replace("%", "%%")
+        try:
+            app = Gio.AppInfo.create_from_commandline(line, None, Gio.AppInfoCreateFlags.NONE)
+            app.launch([], self.get_display().get_app_launch_context())
+        except GLib.Error as error:
+            self.toast(_("Could not open a terminal: {error}").format(error=error.message))
+            return
+        self.toast(_("Opening a terminal on {name}…").format(name=peer["name"]))
 
     def open_peer(self, pid):
         peer = self.st["peers"].get(pid)
@@ -1407,7 +1474,8 @@ class MainWindow(Gtk.ApplicationWindow):
                                                       (workshop, "1" * 32, False))):
             pid = str(number + 1) * 32
             peers[pid] = {"id": pid, "name": name, "user": user, "home": f"/home/{user}", "userkey": key,
-                          "hostkey": key, "port": 22, "updated": now, "via": via, "added": now}
+                          "hostkey": key, "port": 22, "updated": now, "via": via, "added": now,
+                          "shell": True}
             self.online[pid] = "lan" if online else None
         self.st = state.new_state()
         self.st["peers"] = peers
@@ -1501,7 +1569,7 @@ class App(Gtk.Application):
             user, _workshop, _old, public, music = demo_names()
             dialog = ShareDialog(self.window, {"mode": "folders", "folders": [
                 {"path": f"/home/{user}/{public}", "readonly": False},
-                {"path": f"/home/{user}/{music}", "readonly": True}]}, lambda new: None)
+                {"path": f"/home/{user}/{music}", "readonly": True}], "shell": True}, lambda new: None)
             dialog.present()
             GLib.timeout_add(800, lambda: (save_screenshot(dialog.get_child(), path), self.quit(), False)[2])
             return False

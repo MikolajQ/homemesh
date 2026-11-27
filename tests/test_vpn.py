@@ -115,7 +115,7 @@ class RenderTest(HomeTestCase):
         keys = paths.authorized_keys().read_text().splitlines()
         beta = next(line for line in keys if "homemesh:" + "b" * 32 in line)
         gamma = next(line for line in keys if "homemesh:" + "c" * 32 in line)
-        self.assertIn(",127.0.0.0/8,100.101.102.103\" ", beta)
+        self.assertIn(",127.0.0.0/8,100.101.102.103\",restrict", beta)
         self.assertNotIn("100.101.102.103", gamma)
 
 

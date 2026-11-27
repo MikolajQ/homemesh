@@ -13,7 +13,7 @@ Linux computer already has.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/overview-dark.png">
-  <img alt="The HomeMesh window: this computer with its sharing switch, what other computers see, access from away and login tasks; paired computers with their status; a computer nearby ready to pair" src="docs/screenshots/en/overview-light.png" width="544">
+  <img alt="The HomeMesh window: this computer with its sharing switch, what other computers see, with a red warning that paired computers can run commands here and a Turn off button, access from away and login tasks; paired computers with their status and Terminal and Open buttons; a computer nearby ready to pair" src="docs/screenshots/en/overview-light.png" width="544">
 </picture>
 
 ## At a glance
@@ -25,6 +25,7 @@ Linux computer already has.
 | **Introductions** | Pair a new computer with any member of the group and it gets to know all of them; members it never met learn about it the next time they talk. Removing a computer spreads the same way. |
 | **Your file manager** | Paired computers appear as bookmarks in GTK file managers (GVfs) and in Dolphin (KIO). A click mounts; optionally they mount at login. A computer that is off is marked: *(off) laptop*. |
 | **Choose what to share** | The whole home folder, or only chosen folders, each read-write or read-only. Chosen folders are served from a sandbox: the rest of your home, your keys and the system are simply not there. |
+| **A terminal on the other computer** | *Terminal* next to *Open* logs in to that computer in your own terminal program, at home or through the VPN. On by default with the whole home folder, under a red warning with *Turn off* right in the window. |
 | **Away from home** | One click sets up Tailscale: HomeMesh installs it, starts it and opens the login page; no commands. Already have NetBird, ZeroTier, Yggdrasil, Nebula or WireGuard? It finds them by itself. Each connection goes over the local network when possible and through the VPN otherwise, with the same bookmarks. |
 | **Copes with a shaky network** | Where the local network keeps losing the way between two computers (a Wi-Fi mesh that is slow to notice that a laptop moved, for example), connections go through the VPN first until it has been quiet for three days: about as fast at home, and open folders stay open. The window says so and [what helps](docs/local-network.md). |
 | **Light** | GTK 4 without libadwaita, so it fits any desktop. No system daemon: sharing is the system's `sshd`; the window is needed only to find and pair computers, and one small process in your session marks the ones that are off. Works with or without systemd. |
@@ -47,7 +48,7 @@ Linux computer already has.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/share-dark.png">
-  <img alt="Sharing window: whole home folder or only chosen folders, with Public read-write and Music read-only" src="docs/screenshots/en/share-light.png">
+  <img alt="Sharing window: whole home folder (with the terminal option) or only chosen folders, with Public read-write and Music read-only" src="docs/screenshots/en/share-light.png">
 </picture>
 
 </td>
@@ -144,11 +145,27 @@ tries the VPN first.
 
 - **The whole home folder** (default): the same access as your own account,
   settings and keys included. Pair only your own computers.
+  - **Also running commands (terminal)**, on by default: paired computers can
+    open a terminal here (the *Terminal* button on their side) and run any
+    program, as you. The main window says so in red, with *Turn off* next to
+    it. Off, they get files only: SFTP and group syncing go through
+    `homemesh gate`, everything else is refused. That stops casual use, not a
+    determined one, as write access to `~/.bashrc` or autostart is enough to
+    plant a command; for a real limit, share chosen folders.
 - **Only chosen folders**, each read-write or read-only. Paired computers then
   get SFTP only, served by `sftp-server` inside a [bubblewrap](https://github.com/containers/bubblewrap)
   sandbox that holds an otherwise empty home folder with just those folders.
   There is no shell, no port forwarding, no `~/.ssh`, no `/etc` beyond a
   one-line `passwd`. A change ends running sessions, so it applies at once.
+
+Port, agent and X11 forwarding are off for paired keys in every mode
+(`restrict` in `authorized_keys`).
+
+The *Terminal* button runs `ssh` with HomeMesh's own configuration in
+`xdg-terminal-exec` when it is installed, otherwise in the terminal set in
+Plasma, `$TERMINAL`, the desktop's own terminal or a common one (Ptyxis, GNOME
+Console, Konsole, xfce4-terminal, kitty, foot, Alacritty, xterm…). It shows
+only for computers that allow it; their card says so.
 
 ## Command line
 
@@ -165,6 +182,7 @@ tries the VPN first.
     homemesh share add ~/Public [--readonly]
     homemesh share remove ~/Public
     homemesh share home      # back to the whole home folder
+    homemesh share terminal on|off   # may paired computers run commands here
     homemesh autostart on|off
     homemesh rename NAME     # rename this computer on the network
     homemesh away            # set up Tailscale for access from away
@@ -236,7 +254,9 @@ computers [keeps breaking](docs/local-network.md); the two tell each other.
 
 - With the whole home folder shared, paired computers trust each other
   completely: write access to a home folder is as good as running programs
-  there. Pair only your own computers, or share chosen folders.
+  there, and with the terminal on (the default) they run them directly.
+  Pair only your own computers, or share chosen folders.
+- No forwarding of ports, the SSH agent or X11 for paired keys.
 - Keys work only from private addresses and from the peer's own VPN addresses.
   `sshd` stops accepting passwords over the network.
 - Pairing and discovery only accept the local network (and Tailscale/NetBird
@@ -244,7 +264,7 @@ computers [keeps breaking](docs/local-network.md); the two tell each other.
 
 ## Status
 
-Version 0.7: young. It has been tried between Arch-based computers with GNOME,
+Version 0.8: young. It has been tried between Arch-based computers with GNOME,
 KDE Plasma and LXQt. Marking the computers that are off has been tried with
 pcmanfm-qt; Dolphin's side, installing packages outside Arch and the systems
 without systemd (OpenRC, runit, s6, dinit) are written but not yet tested for
@@ -257,7 +277,7 @@ real. Reports are welcome.
 
 ## Development
 
-    make test                            # 148 tests, before a release; the integration tests run private sshd instances
+    make test                            # 158 tests, before a release; the integration tests run private sshd instances
     packaging/arch/build-local.sh        # package the working tree
     homemesh --demo --screenshot x.png   # render the window with made-up computers
 

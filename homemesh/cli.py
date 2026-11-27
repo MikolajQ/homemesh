@@ -65,6 +65,7 @@ def cmd_status(args):
     print(_(".local names: working ({how})").format(how=how) if works
           else _(".local names: not working. Fix: homemesh enable"))
     print(_("Shared: {what}").format(what=share.summary(share.current(st))))
+    warn_commands(share.current(st))
     tunnels = vpn.addresses()  # the card also has those that are down at the moment
     print(_("Away from home: through {vpn}").format(vpn=vpn.describe(tunnels)) if tunnels
           else _("Away from home: not reachable. Set up Tailscale: homemesh away"))
@@ -388,11 +389,18 @@ def cmd_reset(args):
     return 0
 
 
+def warn_commands(shared):
+    if share.allows_commands(shared):
+        print(_("  ! Paired computers can run any program on this account, as you. "
+                "Turn off: homemesh share terminal off"))
+
+
 def save_share(new, stop_sessions=True):
     with state.transaction() as st:
         st["share"] = new
         render.apply(st)
     print(_("Shared: {what}").format(what=share.summary(new)))
+    warn_commands(new)
     if stop_sessions:
         stopped = share.end_connections()
         if stopped:
@@ -405,9 +413,20 @@ def cmd_share(args):
         now = share.current(st)
     if args.action is None:
         print(_("Shared: {what}").format(what=share.summary(now)))
+        warn_commands(now)
         return 0
     if args.action == "home":
-        save_share({"mode": "home", "folders": now["folders"]})
+        save_share(dict(now, mode="home"))
+        return 0
+    if args.action == "terminal":
+        if args.path not in ("on", "off"):
+            print(_("Say on or off: homemesh share terminal on|off"))
+            return 1
+        if args.path == "on" and now["mode"] != "home":
+            print(_("The terminal goes with the whole home folder. First: homemesh share home"))
+            return 1
+        save_share(dict(now, shell=args.path == "on"), stop_sessions=False)
+        print(_("Other computers learn of it when they next sync (homemesh sync does it now)."))
         return 0
     if not args.path:
         print(_("Name a folder."))
@@ -426,7 +445,7 @@ def cmd_share(args):
             if print_result(system.run_helper(["install", *missing], terminal=True), _("Installed.")):
                 return 1
         folders.append({"path": path, "readonly": args.readonly})
-    save_share({"mode": "folders", "folders": folders})
+    save_share(dict(now, mode="folders", folders=folders))
     return 0
 
 
@@ -478,9 +497,10 @@ def build_parser():
     rename.set_defaults(func=cmd_rename)
     shared = sub.add_parser("share", help=_("what other computers see: the whole home folder or "
                                             "chosen folders"))
-    shared.add_argument("action", nargs="?", choices=("home", "add", "remove"),
-                        help=_("home: the whole home folder; add/remove: chosen folders"))
-    shared.add_argument("path", nargs="?")
+    shared.add_argument("action", nargs="?", choices=("home", "add", "remove", "terminal"),
+                        help=_("home: the whole home folder; add/remove: chosen folders; "
+                               "terminal on/off: whether paired computers may run commands"))
+    shared.add_argument("path", nargs="?", help=_("a folder, or on/off after terminal"))
     shared.add_argument("--readonly", action="store_true", help=_("read-only folder"))
     shared.set_defaults(func=cmd_share)
     autostart = sub.add_parser("autostart", help=_("syncing the group, connecting computers and marking "

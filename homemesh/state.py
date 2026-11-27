@@ -27,7 +27,7 @@ ID_RE = re.compile(r"^[0-9a-f]{32}\Z")
 USER_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}\Z")
 IPV4_RE = re.compile(r"^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}\Z")
 CARD_FIELDS = ("id", "name", "user", "home", "userkey", "hostkey", "port", "updated",
-               "version", "address", "vpn")
+               "version", "address", "vpn", "shell")
 
 
 def new_state():
@@ -35,7 +35,7 @@ def new_state():
     # and neither do "via", "added", "automount" and "breaks" of the peers.
     return {"format": FORMAT, "id": uuid.uuid4().hex, "self": {"hash": None, "updated": 0},
             "peers": {}, "removed": {}, "bookmarks": [], "kde": [],
-            "share": {"mode": "home", "folders": []}, "login": True}
+            "share": {"mode": "home", "folders": [], "shell": True}, "login": True}
 
 
 def load():
@@ -84,6 +84,9 @@ def own_card(st, bump=False):
     address = os.environ.get("HOMEMESH_ADVERTISE_ADDRESS")  # tests only
     if address:
         card["address"] = address
+    from . import share  # share imports this module
+    # Whether the others may open a terminal here: they show the button by it.
+    card["shell"] = share.allows_commands(share.current(st))
     mine = st["self"]
     tunnels = vpn.remember(mine.get("vpn") or [])
     if tunnels:
@@ -146,6 +149,8 @@ def validate_card(card):
         out["address"] = address
     if card.get("vpn") is not None:
         out["vpn"] = vpn.validate(card["vpn"])
+    if isinstance(card.get("shell"), bool):  # missing before 0.8.0
+        out["shell"] = card["shell"]
     return out
 
 

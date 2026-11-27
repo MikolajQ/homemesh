@@ -26,18 +26,44 @@ class FolderModeTest(HomeTestCase):
                          [(str(home), True), (str(home / "Publiczny"), False),
                           (str(home / "Publiczny (2)"), True)])
 
-    def test_keys_are_restricted_only_in_folder_mode(self):
+    def test_keys_by_mode(self):
+        """Never forwarding; commands only with the whole home folder and the terminal."""
         with state.transaction() as st:
             state.merge(st, [card("b", "beta", 10)], {}, via="direct")
             render.apply(st)
         line = paths.authorized_keys().read_text()
-        self.assertNotIn("restrict", line)
+        self.assertIn('",restrict,pty ssh-ed25519 ', line)
+        self.assertNotIn("command=", line)
+        for new in ({"mode": "home", "folders": [], "shell": False},
+                    {"mode": "folders", "folders": [], "shell": True}):
+            with state.transaction() as st:
+                st["share"] = new
+                render.apply(st)
+            line = paths.authorized_keys().read_text()
+            self.assertIn(',restrict,command="', line, new)
+            self.assertIn(" gate\" ssh-ed25519 ", line, new)
+            self.assertNotIn("pty", line, new)
+
+    def test_terminal_is_on_by_default_and_only_with_home(self):
+        self.assertEqual(share.current(state.new_state())["shell"], True)
+        self.assertEqual(share.current({"share": {"mode": "home", "folders": []}})["shell"], True)
+        old = {"share": {"mode": "home", "folders": [], "shell": False}}
+        self.assertFalse(share.allows_commands(share.current(old)))
+        folders = {"share": {"mode": "folders", "folders": [], "shell": True}}
+        self.assertFalse(share.allows_commands(share.current(folders)))
+        self.assertTrue(share.allows_commands(share.current(state.new_state())))
+
+    def test_the_card_says_whether_the_terminal_is_allowed(self):
         with state.transaction() as st:
-            st["share"] = {"mode": "folders", "folders": []}
-            render.apply(st)
-        line = paths.authorized_keys().read_text()
-        self.assertIn(',restrict,command="', line)
-        self.assertIn(" gate\" ssh-ed25519 ", line)
+            first = state.own_card(st)
+            self.assertIs(first["shell"], True)
+            st["share"] = {"mode": "home", "folders": [], "shell": False}
+            second = state.own_card(st)
+        self.assertIs(second["shell"], False)
+        self.assertGreater(second["updated"], first["updated"])  # so that it spreads
+        self.assertIs(state.validate_card(dict(card("b", "beta", 10), shell=True))["shell"], True)
+        self.assertNotIn("shell", state.validate_card(card("b", "beta", 10)))
+        self.assertNotIn("shell", state.validate_card(dict(card("b", "beta", 10), shell="yes")))
 
     def test_login_setting_controls_autostart(self):
         with state.transaction() as st:
@@ -50,15 +76,18 @@ class FolderModeTest(HomeTestCase):
         self.assertFalse(paths.autostart_file().exists())
 
     def test_gate_refuses_commands_and_passes_sync(self):
-        env = dict(os.environ, PYTHONPATH=str(ROOT), SSH_ORIGINAL_COMMAND="rm -rf ~")
-        done = subprocess.run([sys.executable, "-m", "homemesh", "gate"], env=env,
-                              capture_output=True, text=True, timeout=30)
-        self.assertEqual(done.returncode, 1)
-        self.assertIn("SFTP", done.stderr)
-        env["SSH_ORIGINAL_COMMAND"] = "homemesh sync-serve"
-        done = subprocess.run([sys.executable, "-m", "homemesh", "gate"], env=env, input="{}",
-                              capture_output=True, text=True, timeout=30)
-        self.assertIn("HOMEMESH-SYNC ", done.stdout)
+        for mode, said in (("folders", "SFTP"), ("home", "terminal is off")):
+            with state.transaction() as st:
+                st["share"] = {"mode": mode, "folders": [], "shell": False}
+            env = dict(os.environ, PYTHONPATH=str(ROOT), SSH_ORIGINAL_COMMAND="rm -rf ~")
+            done = subprocess.run([sys.executable, "-m", "homemesh", "gate"], env=env,
+                                  capture_output=True, text=True, timeout=30)
+            self.assertEqual(done.returncode, share.REFUSED, mode)
+            self.assertIn(said, done.stderr, mode)
+            env["SSH_ORIGINAL_COMMAND"] = "homemesh sync-serve"
+            done = subprocess.run([sys.executable, "-m", "homemesh", "gate"], env=env, input="{}",
+                                  capture_output=True, text=True, timeout=30)
+            self.assertIn("HOMEMESH-SYNC ", done.stdout, mode)
 
 
 @unittest.skipUnless(shutil.which("bwrap") and shutil.which("sftp") and share.sftp_server(),
