@@ -92,6 +92,12 @@ def button(text, callback, *classes):
     return widget
 
 
+def clear(listbox):
+    """The rows only: remove_all() takes the placeholder too."""
+    while (row := listbox.get_row_at_index(0)) is not None:
+        listbox.remove(row)
+
+
 def idle(function, *args):
     def call():
         function(*args)
@@ -483,7 +489,7 @@ class ShareDialog(Dialog):
         self._rebuild()
 
     def _rebuild(self):
-        self.list.remove_all()
+        clear(self.list)
         for folder in self.folders:
             name = label(Path(folder["path"]).name or folder["path"], "heading", ellipsize=True)
             where = label(folder["path"], "dim", "small")
@@ -888,7 +894,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.update_this()
 
     def rebuild_peers(self):
-        self.peer_list.remove_all()
+        clear(self.peer_list)
         self.peer_rows = {}
         names = render.aliases(self.st)
         for pid, peer in sorted(self.st["peers"].items(), key=lambda kv: kv[1]["name"]):
@@ -913,7 +919,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 if entry["id"] in self.peer_rows and self.online.get(entry["id"]) != "lan":
                     self.online[entry["id"]] = "lan"
                     self.peer_rows[entry["id"]].set_online("lan")
-        self.nearby_list.remove_all()
+        clear(self.nearby_list)
         for entry in self.nearby:
             if entry["id"] not in self.st["peers"]:
                 self.nearby_list.append(NearbyRow(self, entry, self.is_ready))
@@ -1355,7 +1361,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.nearby = [{"id": "9" * 32, "name": old, "user": user, "port": 41753,
                         "ready": self.demo != "breaks", "ip": "192.168.1.23", "seen": 0}]
         self.rebuild_peers()
-        self.nearby_list.remove_all()
+        clear(self.nearby_list)
         for entry in self.nearby:
             self.nearby_list.append(NearbyRow(self, entry, True))
         self.update_this()
